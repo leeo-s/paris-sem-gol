@@ -44,3 +44,8 @@ next-env.d.ts
 
 CLAUDE.md
 AGENTS.md
+
+/.idea
+.idea
+
+/docs
