@@ -1,0 +1,446 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model club_events {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String            @db.VarChar(120)
+  event_date      DateTime          @db.Date
+  member_fee      Decimal           @default(0.00) @db.Decimal(8, 2)
+  guest_fee       Decimal           @default(0.00) @db.Decimal(8, 2)
+  description     String?
+  created_by      String            @db.Uuid
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  users           users             @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  event_attendees event_attendees[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model club_settings {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  club_name      String   @default("Meu Time FC") @db.VarChar(120)
+  monthly_fee    Decimal  @default(80.00) @db.Decimal(8, 2)
+  guest_fee      Decimal  @default(25.00) @db.Decimal(8, 2)
+  bbq_member_fee Decimal  @default(0.00) @db.Decimal(8, 2)
+  bbq_guest_fee  Decimal  @default(0.00) @db.Decimal(8, 2)
+  jersey_price   Decimal  @default(0.00) @db.Decimal(8, 2)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model event_attendees {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event_id        String         @db.Uuid
+  user_id         String?        @db.Uuid
+  guest_player_id String?        @db.Uuid
+  is_member       Boolean        @default(true)
+  amount          Decimal        @db.Decimal(8, 2)
+  status          payment_status @default(pending)
+  paid_at         DateTime?      @db.Date
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  club_events     club_events    @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  guest_players   guest_players? @relation(fields: [guest_player_id], references: [id], onUpdate: NoAction)
+  users           users?         @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model financial_transactions {
+  id                                             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type                                           transaction_type
+  category                                       transaction_category
+  amount                                         Decimal              @db.Decimal(8, 2)
+  description                                    String
+  reference_date                                 DateTime             @db.Date
+  user_id                                        String?              @db.Uuid
+  guest_player_id                                String?              @db.Uuid
+  created_by                                     String               @db.Uuid
+  created_at                                     DateTime             @default(now()) @db.Timestamptz(6)
+  users_financial_transactions_created_byTousers users                @relation("financial_transactions_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  guest_players                                  guest_players?       @relation(fields: [guest_player_id], references: [id], onUpdate: NoAction)
+  users_financial_transactions_user_idTousers    users?               @relation("financial_transactions_user_idTousers", fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@index([category], map: "idx_transactions_category")
+  @@index([reference_date], map: "idx_transactions_date")
+  @@index([type], map: "idx_transactions_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model goals {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id        String         @db.Uuid
+  scorer_user_id  String?        @db.Uuid
+  scorer_guest_id String?        @db.Uuid
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  matches         matches        @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  guest_players   guest_players? @relation(fields: [scorer_guest_id], references: [id], onUpdate: NoAction)
+  users           users?         @relation(fields: [scorer_user_id], references: [id], onUpdate: NoAction)
+
+  @@index([match_id], map: "idx_goals_match")
+  @@index([scorer_user_id], map: "idx_goals_scorer")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model goals_conceded {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id          String         @db.Uuid
+  conceder_user_id  String?        @db.Uuid
+  conceder_guest_id String?        @db.Uuid
+  amount            Int            @default(1) @db.SmallInt
+  created_at        DateTime       @default(now()) @db.Timestamptz(6)
+  guest_players     guest_players? @relation(fields: [conceder_guest_id], references: [id], onUpdate: NoAction)
+  users             users?         @relation(fields: [conceder_user_id], references: [id], onUpdate: NoAction)
+  matches           matches        @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([match_id, conceder_user_id])
+  @@index([conceder_user_id], map: "idx_goals_conceded_conceder")
+  @@index([match_id], map: "idx_goals_conceded_match")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model guest_players {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String                   @db.VarChar(120)
+  phone                  String?                  @db.VarChar(20)
+  linked_user_id         String?                  @db.Uuid
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  event_attendees        event_attendees[]
+  financial_transactions financial_transactions[]
+  goals                  goals[]
+  goals_conceded         goals_conceded[]
+  users                  users?                   @relation(fields: [linked_user_id], references: [id], onUpdate: NoAction)
+  jersey_sales           jersey_sales[]
+  match_players          match_players[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model jersey_sales {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String?        @db.Uuid
+  guest_player_id String?        @db.Uuid
+  amount          Decimal        @db.Decimal(8, 2)
+  payment_status  payment_status @default(pending)
+  jersey_status   jersey_status  @default(pending)
+  paid_at         DateTime?      @db.Date
+  delivered_at    DateTime?      @db.Date
+  notes           String?
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  guest_players   guest_players? @relation(fields: [guest_player_id], references: [id], onUpdate: NoAction)
+  users           users?         @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model match_players {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id        String         @db.Uuid
+  user_id         String?        @db.Uuid
+  guest_player_id String?        @db.Uuid
+  is_goalkeeper   Boolean        @default(false)
+  confirmed       Boolean        @default(false)
+  guest_players   guest_players? @relation(fields: [guest_player_id], references: [id], onUpdate: NoAction)
+  matches         matches        @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?         @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+
+  @@unique([match_id, user_id])
+  @@index([match_id], map: "idx_match_players_match")
+  @@index([user_id], map: "idx_match_players_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model match_rounds {
+  id                                                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id                                             String       @db.Uuid
+  round_number                                         Int          @db.SmallInt
+  home_team_id                                         String       @db.Uuid
+  away_team_id                                         String       @db.Uuid
+  winner_team_id                                       String?      @db.Uuid
+  created_at                                           DateTime     @default(now()) @db.Timestamptz(6)
+  match_teams_match_rounds_away_team_idTomatch_teams   match_teams  @relation("match_rounds_away_team_idTomatch_teams", fields: [away_team_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  match_teams_match_rounds_home_team_idTomatch_teams   match_teams  @relation("match_rounds_home_team_idTomatch_teams", fields: [home_team_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  matches                                              matches      @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  match_teams_match_rounds_winner_team_idTomatch_teams match_teams? @relation("match_rounds_winner_team_idTomatch_teams", fields: [winner_team_id], references: [id], onUpdate: NoAction)
+
+  @@unique([match_id, round_number])
+  @@index([match_id], map: "idx_rounds_match")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model match_teams {
+  id                                                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id                                              String         @db.Uuid
+  team_name                                             String         @db.VarChar(40)
+  team_index                                            Int            @db.SmallInt
+  match_rounds_match_rounds_away_team_idTomatch_teams   match_rounds[] @relation("match_rounds_away_team_idTomatch_teams")
+  match_rounds_match_rounds_home_team_idTomatch_teams   match_rounds[] @relation("match_rounds_home_team_idTomatch_teams")
+  match_rounds_match_rounds_winner_team_idTomatch_teams match_rounds[] @relation("match_rounds_winner_team_idTomatch_teams")
+  matches                                               matches        @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([match_id, team_index])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model matches {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_date          DateTime             @db.Date
+  location            String?              @db.VarChar(120)
+  status              match_status         @default(scheduled)
+  tournament_id       String?              @db.Uuid
+  created_by          String               @db.Uuid
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  goals               goals[]
+  goals_conceded      goals_conceded[]
+  match_players       match_players[]
+  match_rounds        match_rounds[]
+  match_teams         match_teams[]
+  users               users                @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tournaments         tournaments?         @relation(fields: [tournament_id], references: [id], onUpdate: NoAction)
+  mvp_votes           mvp_votes[]
+  mvp_voting_sessions mvp_voting_sessions?
+
+  @@index([match_date], map: "idx_matches_date")
+  @@index([tournament_id], map: "idx_matches_tournament")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model monthly_awards {
+  id                                               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  month                                            Int      @db.SmallInt
+  year                                             Int      @db.SmallInt
+  mvp_user_id                                      String?  @db.Uuid
+  top_scorer_user_id                               String?  @db.Uuid
+  best_gk_user_id                                  String?  @db.Uuid
+  most_present_user_id                             String?  @db.Uuid
+  top_streak_user_id                               String?  @db.Uuid
+  created_at                                       DateTime @default(now()) @db.Timestamptz(6)
+  users_monthly_awards_best_gk_user_idTousers      users?   @relation("monthly_awards_best_gk_user_idTousers", fields: [best_gk_user_id], references: [id], onUpdate: NoAction)
+  users_monthly_awards_most_present_user_idTousers users?   @relation("monthly_awards_most_present_user_idTousers", fields: [most_present_user_id], references: [id], onUpdate: NoAction)
+  users_monthly_awards_mvp_user_idTousers          users?   @relation("monthly_awards_mvp_user_idTousers", fields: [mvp_user_id], references: [id], onUpdate: NoAction)
+  users_monthly_awards_top_scorer_user_idTousers   users?   @relation("monthly_awards_top_scorer_user_idTousers", fields: [top_scorer_user_id], references: [id], onUpdate: NoAction)
+  users_monthly_awards_top_streak_user_idTousers   users?   @relation("monthly_awards_top_streak_user_idTousers", fields: [top_streak_user_id], references: [id], onUpdate: NoAction)
+
+  @@unique([month, year])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model monthly_fees {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String         @db.Uuid
+  month      Int            @db.SmallInt
+  year       Int            @db.SmallInt
+  amount     Decimal        @db.Decimal(8, 2)
+  status     payment_status @default(pending)
+  paid_at    DateTime?      @db.Date
+  notes      String?
+  created_at DateTime       @default(now()) @db.Timestamptz(6)
+  users      users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, month, year])
+  @@index([month, year], map: "idx_monthly_fees_month_year")
+  @@index([status], map: "idx_monthly_fees_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model monthly_roster {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String        @db.Uuid
+  month      Int           @db.SmallInt
+  year       Int           @db.SmallInt
+  status     roster_status @default(active)
+  created_at DateTime      @default(now()) @db.Timestamptz(6)
+  users      users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, month, year])
+  @@index([month, year], map: "idx_roster_month_year")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mvp_votes {
+  id                                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id                             String   @db.Uuid
+  voter_user_id                        String   @db.Uuid
+  voted_user_id                        String   @db.Uuid
+  created_at                           DateTime @default(now()) @db.Timestamptz(6)
+  matches                              matches  @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_mvp_votes_voted_user_idTousers users    @relation("mvp_votes_voted_user_idTousers", fields: [voted_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_mvp_votes_voter_user_idTousers users    @relation("mvp_votes_voter_user_idTousers", fields: [voter_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([match_id, voter_user_id])
+  @@index([match_id], map: "idx_mvp_votes_match")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mvp_voting_sessions {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  match_id         String   @unique @db.Uuid
+  opened_at        DateTime @default(now()) @db.Timestamptz(6)
+  closes_at        DateTime @default(dbgenerated("(now() + '24:00:00'::interval)")) @db.Timestamptz(6)
+  is_closed        Boolean  @default(false)
+  eligible_voters  Int      @default(0) @db.SmallInt
+  total_votes_cast Int      @default(0) @db.SmallInt
+  matches          matches  @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model player_ratings {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @unique @db.Uuid
+  speed      Int      @default(5) @db.SmallInt
+  finishing  Int      @default(5) @db.SmallInt
+  passing    Int      @default(5) @db.SmallInt
+  dribbling  Int      @default(5) @db.SmallInt
+  defense    Int      @default(5) @db.SmallInt
+  overall    Int?     @default(dbgenerated("(((((speed + finishing) + passing) + dribbling) + defense) / 5)")) @db.SmallInt
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tournament_teams {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tournament_id String      @db.Uuid
+  team_name     String      @db.VarChar(80)
+  points        Int         @default(0) @db.SmallInt
+  wins          Int         @default(0) @db.SmallInt
+  draws         Int         @default(0) @db.SmallInt
+  losses        Int         @default(0) @db.SmallInt
+  goals_for     Int         @default(0) @db.SmallInt
+  goals_against Int         @default(0) @db.SmallInt
+  tournaments   tournaments @relation(fields: [tournament_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tournament_id, team_name])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tournaments {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String             @db.VarChar(120)
+  format           tournament_format  @default(round_robin)
+  status           tournament_status  @default(draft)
+  is_special_event Boolean            @default(false)
+  start_date       DateTime?          @db.Date
+  end_date         DateTime?          @db.Date
+  description      String?
+  created_by       String             @db.Uuid
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  matches          matches[]
+  tournament_teams tournament_teams[]
+  users            users              @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id                                                              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                                            String                   @db.VarChar(120)
+  nickname                                                        String?                  @db.VarChar(60)
+  email                                                           String                   @unique @db.VarChar(255)
+  password_hash                                                   String
+  role                                                            user_role                @default(player)
+  photo_url                                                       String?
+  birth_date                                                      DateTime?                @db.Date
+  phone                                                           String?                  @db.VarChar(20)
+  position                                                        String?                  @db.VarChar(40)
+  is_goalkeeper                                                   Boolean                  @default(false)
+  is_active                                                       Boolean                  @default(true)
+  invited_at                                                      DateTime?                @db.Timestamptz(6)
+  first_login_at                                                  DateTime?                @db.Timestamptz(6)
+  created_at                                                      DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at                                                      DateTime                 @default(now()) @db.Timestamptz(6)
+  club_events                                                     club_events[]
+  event_attendees                                                 event_attendees[]
+  financial_transactions_financial_transactions_created_byTousers financial_transactions[] @relation("financial_transactions_created_byTousers")
+  financial_transactions_financial_transactions_user_idTousers    financial_transactions[] @relation("financial_transactions_user_idTousers")
+  goals                                                           goals[]
+  goals_conceded                                                  goals_conceded[]
+  guest_players                                                   guest_players[]
+  jersey_sales                                                    jersey_sales[]
+  match_players                                                   match_players[]
+  matches                                                         matches[]
+  monthly_awards_monthly_awards_best_gk_user_idTousers            monthly_awards[]         @relation("monthly_awards_best_gk_user_idTousers")
+  monthly_awards_monthly_awards_most_present_user_idTousers       monthly_awards[]         @relation("monthly_awards_most_present_user_idTousers")
+  monthly_awards_monthly_awards_mvp_user_idTousers                monthly_awards[]         @relation("monthly_awards_mvp_user_idTousers")
+  monthly_awards_monthly_awards_top_scorer_user_idTousers         monthly_awards[]         @relation("monthly_awards_top_scorer_user_idTousers")
+  monthly_awards_monthly_awards_top_streak_user_idTousers         monthly_awards[]         @relation("monthly_awards_top_streak_user_idTousers")
+  monthly_fees                                                    monthly_fees[]
+  monthly_roster                                                  monthly_roster[]
+  mvp_votes_mvp_votes_voted_user_idTousers                        mvp_votes[]              @relation("mvp_votes_voted_user_idTousers")
+  mvp_votes_mvp_votes_voter_user_idTousers                        mvp_votes[]              @relation("mvp_votes_voter_user_idTousers")
+  player_ratings                                                  player_ratings?
+  tournaments                                                     tournaments[]
+
+  @@index([is_active], map: "idx_users_active")
+  @@index([email], map: "idx_users_email")
+  @@index([role], map: "idx_users_role")
+}
+
+enum jersey_status {
+  pending
+  paid
+  delivered
+}
+
+enum match_status {
+  scheduled
+  completed
+  cancelled
+}
+
+enum payment_status {
+  pending
+  paid
+  late
+  cancelled
+}
+
+enum roster_status {
+  active
+  inactive
+}
+
+enum tournament_format {
+  round_robin
+  knockout
+}
+
+enum tournament_status {
+  draft
+  active
+  finished
+  cancelled
+}
+
+enum transaction_category {
+  monthly_fee
+  guest_fee
+  bbq
+  jersey
+  field_rental
+  equipment
+  other
+}
+
+enum transaction_type {
+  income
+  expense
+}
+
+enum user_role {
+  admin
+  co_admin
+  player
+}
