@@ -171,3 +171,24 @@ export async function DELETE(
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
     }
 }
+
+// PUT alterar a foto de perfil do usuário
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try{
+        const supabase = await createServerSupabaseClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        }
+
+
+
+    } catch (error) {
+        const respostaPrisma = tratarErroPrisma(error)
+        if(respostaPrisma) return respostaPrisma
+
+        console.error('[PUT /api/users]', error)
+        return NextResponse.json({error: 'Error interno do servidor'}, {status: 500})
+    }
+}
