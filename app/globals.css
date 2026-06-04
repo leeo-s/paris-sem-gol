@@ -1,26 +1,193 @@
+/* ============================================================
+   PARIS SEM GOL — globals.css
+   Design tokens, tema claro/escuro e resets base
+   ============================================================ */
+
 @import "tailwindcss";
 
+/* ---------- TEMA ESCURO via atributo data-theme ---------- */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------- TEMA CUSTOMIZADO ---------- */
+@theme {
+  /* ── Cores Brand (fixas, não mudam com tema) ── */
+  --color-navy:       #0D1B3E;
+  --color-navy-800:   #12214A;
+  --color-navy-700:   #1B2C57;
+  --color-navy-600:   #23386B;
+  --color-navy-400:   #5C6E96;
+  --color-navy-200:   #8DA0C4;
+
+  --color-red:        #C41230;
+  --color-red-dark:   #8C0D22;
+  --color-red-light:  #FBEAED;
+
+  --color-gold:       #C9A84C;
+  --color-gold-deep:  #A6802A;
+  --color-gold-text:  #7A5A12;
+  --color-gold-light: #FAF3E0;
+
+  --color-green:       #1C7C4F;
+  --color-green-light: #E6F3EC;
+
+  --color-amber:       #9A6A00;
+  --color-amber-light: #FBF1D7;
+
+  /* ── Cores semânticas (CSS-var driven, mudam com tema) ── */
+  --color-bg:       var(--bg);
+  --color-surface:  var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-border:       var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-line:         var(--line);
+
+  --color-ink:       var(--text);
+  --color-ink-2:     var(--text-2);
+  --color-ink-3:     var(--text-3);
+  --color-ink-brand: var(--text-on-brand);
+
+  --color-primary:        var(--primary);
+  --color-primary-hover:  var(--primary-hover);
+  --color-secondary:      var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-accent:         var(--accent);
+
+  /* ── Fontes ── */
+  --font-sans: var(--font-barlow), 'Segoe UI', system-ui, sans-serif;
+  --font-cond: var(--font-barlow-condensed), 'Barlow', sans-serif;
+
+  /* ── Tamanhos de fonte com line-height ── */
+  --text-11: 11px;
+  --text-11--line-height: 1.3;
+  --text-13: 13px;
+  --text-13--line-height: 1.4;
+  --text-15: 15px;
+  --text-15--line-height: 1.45;
+  --text-18: 18px;
+  --text-18--line-height: 1.3;
+  --text-20: 20px;
+  --text-20--line-height: 1.2;
+  --text-24: 24px;
+  --text-24--line-height: 1;
+  --text-26: 26px;
+  --text-26--line-height: 1.05;
+  --text-30: 30px;
+  --text-30--line-height: 1;
+  --text-34: 34px;
+  --text-34--line-height: 1;
+  --text-52: 52px;
+  --text-52--line-height: 0.95;
+
+  /* ── Border radius ── */
+  --radius-sm:   8px;
+  --radius-md:   10px;
+  --radius-lg:   12px;
+  --radius-xl:   14px;
+  --radius-2xl:  18px;
+  --radius-pill: 999px;
+
+  /* ── Sombras ── */
+  --shadow-sm:    0 1px 2px rgba(13,27,62,.06);
+  --shadow:       0 6px 20px rgba(13,27,62,.08);
+  --shadow-lg:    0 18px 50px rgba(13,27,62,.16);
+  --shadow-focus: 0 0 0 3px rgba(13,27,62,.08);
+
+  /* ── Curva de animação ── */
+  --ease-brand: cubic-bezier(.2,.6,.2,1);
+}
+
+/* ---------- 1. DESIGN TOKENS — CLARO (padrão) ---------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand primitives */
+  --navy:        #0D1B3E;
+  --navy-800:    #12214A;
+  --navy-700:    #1B2C57;
+  --navy-600:    #23386B;
+  --navy-400:    #5C6E96;
+  --navy-200:    #8DA0C4;
+  --red:         #C41230;
+  --red-dark:    #8C0D22;
+  --red-light:   #FBEAED;
+  --gold:        #C9A84C;
+  --gold-deep:   #A6802A;
+  --gold-text:   #7A5A12;
+  --gold-light:  #FAF3E0;
+  --green:       #1C7C4F;
+  --green-light: #E6F3EC;
+  --amber:       #9A6A00;
+  --amber-light: #FBF1D7;
+
+  /* Semânticos — superfícies */
+  --bg:        #EEF1F7;
+  --surface:   #FFFFFF;
+  --surface-2: #F2F5FA;
+  --surface-3: #E9EDF5;
+
+  /* Semânticos — bordas */
+  --border:        #E2E7F1;
+  --border-strong: #D7DDEA;
+  --line:          #EAEDF4;
+
+  /* Semânticos — texto */
+  --text:          #0F1729;
+  --text-2:        #56607A;
+  --text-3:        #8B95AC;
+  --text-on-brand: #FFFFFF;
+
+  /* Semânticos — roles de marca */
+  --primary:         var(--navy);
+  --primary-hover:   var(--navy-700);
+  --secondary:       var(--red);
+  --secondary-hover: var(--red-dark);
+  --accent:          var(--gold);
+
+  --focus-ring: 0 0 0 3px rgba(13,27,62,.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ---------- 2. DESIGN TOKENS — ESCURO ---------- */
+[data-theme="dark"] {
+  --bg:        #0A1330;
+  --surface:   #11203F;
+  --surface-2: #16264A;
+  --surface-3: #1E3056;
+
+  --border:        #25365F;
+  --border-strong: #324778;
+  --line:          #1F2F54;
+
+  --text:          #EAF0FB;
+  --text-2:        #A9B7D6;
+  --text-3:        #6E7FA6;
+  --text-on-brand: #FFFFFF;
+
+  --primary:         #3A57A8;
+  --primary-hover:   #4A69C0;
+  --secondary:       #E0344F;
+  --secondary-hover: #F04A64;
+  --accent:          #D9BC63;
+
+  --red-light:   #2A1620;
+  --green-light: #102A1E;
+  --amber-light: #2A2310;
+  --gold-light:  #261F0F;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ---------- 3. RESETS BASE ---------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-barlow), 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
 }
+
+/* ---------- 4. UTILITÁRIOS GLOBAIS ---------- */
+.font-cond { font-family: var(--font-barlow-condensed), 'Barlow', sans-serif; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
