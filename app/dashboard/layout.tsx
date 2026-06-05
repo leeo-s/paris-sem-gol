@@ -1,33 +1,34 @@
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/AppSidebar"
-import { BottomNav } from "@/components/BottomNav"
+import { getSessionUser } from "@/lib/get-session-user";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
+import { AppHeader } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
+  const user = await getSessionUser();
+
+  console.log("user:", user);
+
   return (
-    <SidebarProvider>
+    <SidebarProvider style={{ "--sidebar-width": "11rem" } as React.CSSProperties}>
       {/* Desktop sidebar — hidden on mobile */}
       <div className="hidden md:flex">
-        <AppSidebar />
+        <AppSidebar user={user} />
       </div>
 
       <SidebarInset className="flex flex-col min-h-svh">
-        {/* Top bar with sidebar trigger (desktop only) */}
-        <header className="hidden md:flex h-12 shrink-0 items-center border-b border-border px-4">
-          <SidebarTrigger />
-        </header>
+        <AppHeader user={user} />
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
-          {children}
-        </main>
+        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">{children}</main>
       </SidebarInset>
 
       {/* Mobile bottom nav — hidden on desktop */}
       <BottomNav />
     </SidebarProvider>
-  )
+  );
 }

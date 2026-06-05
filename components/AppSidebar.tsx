@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Trophy,
@@ -9,7 +9,7 @@ import {
   BarChart2,
   Settings,
   Swords,
-} from "lucide-react"
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -22,31 +22,51 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Partidas", href: "/dashboard/partidas", icon: Swords },
-  { title: "Jogadores", href: "/dashboard/jogadores", icon: Users },
-  { title: "Classificação", href: "/dashboard/classificacao", icon: BarChart2 },
-  { title: "Torneios", href: "/dashboard/torneios", icon: Trophy },
-]
+  { title: "Partidas", href: "/matches", icon: Swords },
+  { title: "Jogadores", href: "/players", icon: Users },
+  { title: "Classificação", href: "/rank", icon: BarChart2 },
+  { title: "Torneios", href: "/championships", icon: Trophy },
+];
 
 const bottomItems = [
-  { title: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
-]
+  { title: "Configurações", href: "/configuration", icon: Settings },
+];
 
-export function AppSidebar() {
-  const pathname = usePathname()
+type SessionUser = {
+  name: string;
+  nickname: string | null;
+  role: string;
+  photo_url: string | null;
+};
+
+function getInitials(name: string): string {
+  return name
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+export function AppSidebar({ user }: { user: SessionUser | null }) {
+  const pathname = usePathname();
 
   return (
     <Sidebar>
-      <SidebarHeader className="px-4 py-5">
+      <SidebarHeader className="px-11 py-5">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="font-heading text-2xl text-sidebar-primary tracking-wide">
-            PARIS SEM GOL
-          </span>
+          <Avatar className="size-20 md:size-20 after:hidden">
+            <AvatarImage src="/logo.png" alt="Paris Sem Gol" />
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground font-heading text-xl">
+              PSG
+            </AvatarFallback>
+          </Avatar>
         </Link>
       </SidebarHeader>
 
@@ -56,19 +76,20 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive = pathname === item.href
+                const isActive = pathname === item.href;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       render={<Link href={item.href} />}
                       isActive={isActive}
                       tooltip={item.title}
+                      className="data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground"
                     >
                       <item.icon />
                       <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )
+                );
               })}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -78,22 +99,23 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           {bottomItems.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href;
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   render={<Link href={item.href} />}
                   isActive={isActive}
                   tooltip={item.title}
+                  className="data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground"
                 >
                   <item.icon />
                   <span>{item.title}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            )
+            );
           })}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

@@ -18,6 +18,7 @@ export const navigation: NavSection[] = [
   {
     title: "Components",
     items: [
+      { name: "Header", href: "/styleguide/components/header" },
       { name: "Navigation", href: "/styleguide/components/navigation" },
       { name: "Mobile Menu", href: "/styleguide/components/mobile-menu" },
       { name: "Avatar", href: "/styleguide/components/avatar" },
