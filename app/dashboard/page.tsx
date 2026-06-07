@@ -1,16 +1,16 @@
-import { redirect } from "next/navigation"
-import { prisma } from "@/config/prisma"
-import { createServerSupabaseClient } from "@/config/supabase/server"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { PlayerAvatar } from "@/components/PlayerAvatar"
-import { cn } from "@/lib/utils"
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { createServerSupabaseClient } from "@/config/supabase/server";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { cn } from "@/lib/utils";
 import {
   MapPin,
   Users2,
-  Shuffle,
+  CheckCircle,
   Trophy,
   Cake,
   Flame,
@@ -19,7 +19,7 @@ import {
   Star,
   Banknote,
   ShieldAlert,
-} from "lucide-react"
+} from "lucide-react";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,53 +29,90 @@ function fmt(value: number) {
     currency: "BRL",
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(value)
+  }).format(value);
 }
 
 function monthName(m: number) {
-  return new Date(2000, m - 1).toLocaleDateString("pt-BR", { month: "long" })
+  return new Date(2000, m - 1).toLocaleDateString("pt-BR", { month: "long" });
 }
 
 function monthAbbr(m: number) {
   return new Date(2000, m - 1)
     .toLocaleDateString("pt-BR", { month: "short" })
     .replace(".", "")
-    .toUpperCase()
+    .toUpperCase();
 }
 
-function calcAge(birthDate: Date) {
-  const today = new Date()
-  const b = new Date(birthDate)
-  let a = today.getFullYear() - b.getFullYear()
-  if (today < new Date(today.getFullYear(), b.getMonth(), b.getDate())) a--
-  return a
+function calcAge(birthDate: string | Date) {
+  const today = new Date();
+  const b = new Date(birthDate);
+  let a = today.getFullYear() - b.getFullYear();
+  if (today < new Date(today.getFullYear(), b.getMonth(), b.getDate())) a--;
+  return a;
 }
 
 function dName(name: string, nickname: string | null) {
-  return nickname ?? name
+  return nickname ?? name;
 }
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
 type PlayerProfile = {
-  id: string
-  name: string
-  nickname: string | null
-  photo_url: string | null
-  position?: string | null
-}
+  id: string;
+  name: string;
+  nickname: string | null;
+  photo_url: string | null;
+  position?: string | null;
+};
+
+type DashboardData = {
+  periodo: { mes: number; ano: number };
+  artilheirosDoMes: Array<{ jogador: PlayerProfile; gols: number }>;
+  artilheirosTemporada: Array<{ jogador: PlayerProfile; gols: number }>;
+  goleirosComMenosGols: Array<{
+    jogador: PlayerProfile;
+    totalGolsSofridos: number;
+    partidas: number;
+    mediaPorPartida: number;
+  }>;
+  maisPresentesDoMes: Array<{ jogador: PlayerProfile; presencas: number }>;
+  totalPartidasDoMes: number;
+  mvpDoMes: { jogador: PlayerProfile; votos: number } | null;
+  mvpsPorPartida: Array<{
+    data: string;
+    local: string | null;
+    // Top 3 candidatos a MVP ordenados por votos decrescente
+    top3Mvps: Array<{ jogador: PlayerProfile; votos: number }>;
+  }>;
+  proximaPartida: {
+    match_date: string;
+    location: string | null;
+    status: string;
+    match_players: { id: string }[];
+  } | null;
+  aniversariantesDoMes: Array<{
+    id: string;
+    name: string;
+    nickname: string | null;
+    photo_url: string | null;
+    birth_date: string | null;
+    ehHoje: boolean;
+  }>;
+  caixa: {
+    saldo: number;
+    totalEntradas: number;
+    totalSaidas: number;
+    entradasMes: number;
+    saidasMes: number;
+  };
+};
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function ProximaPartidaCard({
   match,
 }: {
-  match: {
-    match_date: Date
-    location: string | null
-    status: string
-    match_players: { id: string }[]
-  } | null
+  match: DashboardData["proximaPartida"];
 }) {
   if (!match) {
     return (
@@ -89,13 +126,13 @@ function ProximaPartidaCard({
           </p>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const d = new Date(match.match_date)
-  const day = d.getUTCDate().toString().padStart(2, "0")
-  const mon = monthAbbr(d.getUTCMonth() + 1)
-  const playerCount = match.match_players.length
+  const d = new Date(match.match_date);
+  const day = d.getUTCDate().toString().padStart(2, "0");
+  const mon = monthAbbr(d.getUTCMonth() + 1);
+  //const playerCount = match.match_players.length
 
   return (
     <Card className="bg-primary text-primary-foreground border-none">
@@ -117,9 +154,9 @@ function ProximaPartidaCard({
               <p className="text-[10px] uppercase tracking-widest text-primary-foreground/50">
                 Próxima Partida
               </p>
-              <Badge className="bg-accent text-accent-foreground text-[10px] shrink-0">
+              {/* <Badge className="bg-accent text-accent-foreground text-[10px] shrink-0">
                 Em Aberto
-              </Badge>
+              </Badge> */}
             </div>
             <h2 className="font-heading text-xl md:text-2xl leading-tight text-primary-foreground">
               Pelada Semanal
@@ -131,12 +168,6 @@ function ProximaPartidaCard({
                   {match.location}
                 </span>
               )}
-              {playerCount > 0 && (
-                <span className="flex items-center gap-1 text-xs text-primary-foreground/60">
-                  <Users2 className="size-3" />
-                  {playerCount} jogadores
-                </span>
-              )}
             </div>
           </div>
 
@@ -144,10 +175,10 @@ function ProximaPartidaCard({
           <Button
             size="sm"
             variant="outline"
-            className="hidden sm:flex border-primary-foreground/25 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground gap-1.5 shrink-0"
+            className="hidden sm:flex bg-gold border-gold text-gold-foreground hover:bg-gold/90 hover:text-gold-foreground gap-1.5 shrink-0"
           >
-            <Shuffle className="size-3.5" />
-            Sortear Times
+            <CheckCircle className="size-3.5" />
+            Confirmar Presença
           </Button>
         </div>
 
@@ -155,14 +186,14 @@ function ProximaPartidaCard({
         <Button
           size="sm"
           variant="outline"
-          className="sm:hidden mt-3 w-full border-primary-foreground/25 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground gap-1.5"
+          className="sm:hidden mt-3 w-full bg-gold border-gold text-gold-foreground hover:bg-gold/90 hover:text-gold-foreground gap-1.5"
         >
-          <Shuffle className="size-3.5" />
-          Sortear Times
+          <CheckCircle className="size-3.5" />
+          Confirmar Presença
         </Button>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function MvpCard({
@@ -170,13 +201,13 @@ function MvpCard({
   wins,
   mes,
 }: {
-  mvp: { jogador: PlayerProfile | undefined; votos: number } | null
-  wins: number
-  mes: number
+  mvp: DashboardData["mvpDoMes"];
+  wins: number;
+  mes: number;
 }) {
-  const mon = monthAbbr(mes)
+  const mon = monthAbbr(mes);
   const monFull =
-    monthName(mes).charAt(0).toUpperCase() + monthName(mes).slice(1)
+    monthName(mes).charAt(0).toUpperCase() + monthName(mes).slice(1);
 
   return (
     <Card className="bg-accent border-none">
@@ -218,25 +249,20 @@ function MvpCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function SaldoCard({
-  financeiro,
+  caixa,
   mes,
   ano,
 }: {
-  financeiro: {
-    saldo: number
-    totalEntradas: number
-    entradasMes: number
-    saidasMes: number
-  }
-  mes: number
-  ano: number
+  caixa: DashboardData["caixa"];
+  mes: number;
+  ano: number;
 }) {
   const monCap =
-    monthName(mes).charAt(0).toUpperCase() + monthName(mes).slice(1)
+    monthName(mes).charAt(0).toUpperCase() + monthName(mes).slice(1);
 
   return (
     <Card>
@@ -249,44 +275,37 @@ function SaldoCard({
         </div>
 
         <p className="font-heading text-3xl md:text-4xl text-foreground leading-none">
-          {fmt(financeiro.saldo)}
+          {fmt(caixa.saldo)}
         </p>
 
         <p className="text-xs text-muted-foreground mt-1.5 mb-3">
           {monCap} {ano}
-          {financeiro.totalEntradas > 0 && (
-            <> · Caixa total: {fmt(financeiro.totalEntradas)}</>
+          {caixa.totalEntradas > 0 && (
+            <> · Caixa total: {fmt(caixa.totalEntradas)}</>
           )}
         </p>
 
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex items-center text-xs bg-success/10 text-success px-2.5 py-1 rounded-full font-medium">
-            ↑ {fmt(financeiro.entradasMes)} receitas
+            ↑ {fmt(caixa.entradasMes)} receitas
           </span>
           <span className="inline-flex items-center text-xs bg-destructive/10 text-destructive px-2.5 py-1 rounded-full font-medium">
-            ↓ {fmt(financeiro.saidasMes)} despesas
+            ↓ {fmt(caixa.saidasMes)} despesas
           </span>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function AniversariantesCard({
   aniversariantes,
   mes,
 }: {
-  aniversariantes: Array<{
-    id: string
-    name: string
-    nickname: string | null
-    photo_url: string | null
-    birth_date: Date | null
-    ehHoje: boolean
-  }>
-  mes: number
+  aniversariantes: DashboardData["aniversariantesDoMes"];
+  mes: number;
 }) {
-  const mon = monthAbbr(mes)
+  const mon = monthAbbr(mes);
 
   return (
     <Card>
@@ -331,7 +350,7 @@ function AniversariantesCard({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function ArtilheirosCard({
@@ -339,12 +358,12 @@ function ArtilheirosCard({
   titulo,
   iconType,
 }: {
-  data: Array<{ jogador: PlayerProfile | undefined; gols: number }>
-  titulo: string
-  iconType: "flame" | "target"
+  data: Array<{ jogador: PlayerProfile; gols: number }>;
+  titulo: string;
+  iconType: "flame" | "target";
 }) {
-  const maxGols = data[0]?.gols ?? 1
-  const Icon = iconType === "flame" ? Flame : Target
+  const maxGols = data[0]?.gols ?? 1;
+  const Icon = iconType === "flame" ? Flame : Target;
 
   return (
     <Card>
@@ -363,7 +382,10 @@ function ArtilheirosCard({
           <div className="space-y-3">
             {data.map((item, index) =>
               item.jogador ? (
-                <div key={item.jogador.id} className="flex items-center gap-2.5">
+                <div
+                  key={item.jogador.id}
+                  className="flex items-center gap-2.5"
+                >
                   <span className="font-heading text-sm text-muted-foreground w-4 shrink-0 leading-none">
                     {index + 1}
                   </span>
@@ -390,29 +412,24 @@ function ArtilheirosCard({
                     {item.gols}
                   </span>
                 </div>
-              ) : null
+              ) : null,
             )}
           </div>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function GoleirosCard({
   data,
   mes,
 }: {
-  data: Array<{
-    jogador: PlayerProfile | undefined
-    totalGolsSofridos: number
-    partidas: number
-    mediaPorPartida: number
-  }>
-  mes: number
+  data: DashboardData["goleirosComMenosGols"];
+  mes: number;
 }) {
-  const mon = monthAbbr(mes)
-  const maxGols = Math.max(...data.map((g) => g.totalGolsSofridos), 1)
+  const mon = monthAbbr(mes);
+  const maxGols = Math.max(...data.map((g) => g.totalGolsSofridos), 1);
 
   return (
     <Card>
@@ -443,15 +460,14 @@ function GoleirosCard({
                         {dName(g.jogador.name, g.jogador.nickname)}
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {mon} · {g.partidas} jogo{g.partidas !== 1 ? "s" : ""}{" "}
-                        · média: {g.mediaPorPartida.toFixed(1)}/jogo
+                        {mon} · {g.partidas} jogo{g.partidas !== 1 ? "s" : ""} ·
+                        média: {g.mediaPorPartida.toFixed(1)}/jogo
                       </p>
                     </div>
                     <span className="font-heading text-xl text-foreground shrink-0">
                       {g.totalGolsSofridos}
                     </span>
                   </div>
-                  {/* Color-coded bar: fewer goals = green, more = red */}
                   <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
                     <div
                       className={cn(
@@ -459,8 +475,8 @@ function GoleirosCard({
                         g.mediaPorPartida <= 1.5
                           ? "bg-success"
                           : g.mediaPorPartida <= 2.5
-                          ? "bg-warning"
-                          : "bg-destructive"
+                            ? "bg-warning"
+                            : "bg-destructive",
                       )}
                       style={{
                         width: `${Math.round((g.totalGolsSofridos / maxGols) * 100)}%`,
@@ -468,28 +484,23 @@ function GoleirosCard({
                     />
                   </div>
                 </div>
-              ) : null
+              ) : null,
             )}
           </div>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function PartidasMvpCard({
   partidas,
   mes,
 }: {
-  partidas: Array<{
-    data: Date
-    local: string | null
-    mvp: PlayerProfile | null
-    votos: number
-  }>
-  mes: number
+  partidas: DashboardData["mvpsPorPartida"];
+  mes: number;
 }) {
-  const mon = monthAbbr(mes)
+  const mon = monthAbbr(mes);
 
   return (
     <Card>
@@ -509,12 +520,12 @@ function PartidasMvpCard({
         ) : (
           <div className="space-y-3">
             {partidas.map((p, i) => {
-              const d = new Date(p.data)
+              const d = new Date(p.data);
               const dateStr = `${d.getUTCDate().toString().padStart(2, "0")}/${(
                 d.getUTCMonth() + 1
               )
                 .toString()
-                .padStart(2, "0")}/${d.getUTCFullYear()}`
+                .padStart(2, "0")}/${d.getUTCFullYear()}`;
 
               return (
                 <div
@@ -530,28 +541,54 @@ function PartidasMvpCard({
                       Encerrada
                     </Badge>
                   </div>
-                  {p.mvp && (
-                    <div className="flex items-center gap-2 bg-accent/15 rounded-lg px-2.5 py-1.5">
-                      <Star
-                        className="size-3 text-accent shrink-0"
-                        fill="currentColor"
-                      />
-                      <span className="text-xs font-medium text-foreground truncate">
-                        MVP: {dName(p.mvp.name, p.mvp.nickname)}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                        {p.votos} votos
-                      </span>
-                    </div>
-                  )}
+                  {/* Exibe o top 3 de candidatos a MVP da partida */}
+                  {p.top3Mvps.map((candidato, posicao) => {
+                    // Primeiro colocado recebe destaque visual diferenciado
+                    const ehPrimeiro = posicao === 0;
+                    return (
+                      <div
+                        key={candidato.jogador.id}
+                        className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ${
+                          ehPrimeiro
+                            ? "bg-accent/15"
+                            : "bg-muted/40"
+                        }`}
+                      >
+                        {ehPrimeiro ? (
+                          <Star
+                            className="size-3 text-accent shrink-0"
+                            fill="currentColor"
+                          />
+                        ) : (
+                          // Posição numérica para 2º e 3º colocados
+                          <span className="size-3 text-[9px] font-bold text-muted-foreground shrink-0 flex items-center justify-center">
+                            {posicao + 1}º
+                          </span>
+                        )}
+                        <span
+                          className={`text-xs truncate ${
+                            ehPrimeiro
+                              ? "font-medium text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {ehPrimeiro && "MVP: "}
+                          {dName(candidato.jogador.name, candidato.jogador.nickname)}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                          {candidato.votos} votos
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              )
+              );
             })}
           </div>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function PresencasCard({
@@ -560,14 +597,14 @@ function PresencasCard({
   totalPartidas,
 }: {
   data: Array<{
-    jogador: PlayerProfile | undefined
-    presencas: number
-    percentual: number
-  }>
-  mes: number
-  totalPartidas: number
+    jogador: PlayerProfile;
+    presencas: number;
+    percentual: number;
+  }>;
+  mes: number;
+  totalPartidas: number;
 }) {
-  const mon = monthAbbr(mes)
+  const mon = monthAbbr(mes);
 
   return (
     <Card>
@@ -613,337 +650,84 @@ function PresencasCard({
                       item.percentual === 100
                         ? "text-success"
                         : item.percentual >= 75
-                        ? "text-foreground"
-                        : item.percentual >= 50
-                        ? "text-warning"
-                        : "text-destructive"
+                          ? "text-foreground"
+                          : item.percentual >= 50
+                            ? "text-warning"
+                            : "text-destructive",
                     )}
                   >
                     {item.percentual}%
                   </span>
                 </div>
-              ) : null
+              ) : null,
             )}
           </div>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
-export const metadata = {
+export const metadata: import("next").Metadata = {
   title: "Dashboard",
-}
+};
 
 export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect("/login")
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  const today = new Date()
-  const mes = today.getMonth() + 1
-  const ano = today.getFullYear()
-  const inicioDoPeriodo = new Date(ano, mes - 1, 1)
-  const fimDoPeriodo = new Date(ano, mes, 0, 23, 59, 59)
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const proto = headersList.get("x-forwarded-proto") ?? "http";
 
-  const [
-    artilheirosDoMesRaw,
-    artilheirosTemporadaRaw,
-    goleirosRaw,
-    presencasRaw,
-    mvpRaw,
-    proximaPartida,
-    aniversariantesRaw,
-    financeiro,
-    partidasComMvpRaw,
+  const res = await fetch(`${proto}://${host}/api/dashboard`, {
+    headers: { Cookie: headersList.get("cookie") ?? "" },
+    cache: "no-store",
+  });
+
+  console.log("resposta dashboard: ", res);
+
+  if (!res.ok) {
+    throw new Error("Falha ao carregar dados do dashboard");
+  }
+
+  const data: DashboardData = await res.json();
+
+  const {
+    periodo,
+    artilheirosDoMes,
+    artilheirosTemporada,
+    goleirosComMenosGols,
+    maisPresentesDoMes,
     totalPartidasDoMes,
-  ] = await Promise.all([
-    // Top scorers of the month
-    prisma.goals.groupBy({
-      by: ["scorer_user_id"],
-      where: {
-        scorer_user_id: { not: null },
-        matches: {
-          match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-          status: "completed",
-        },
-      },
-      _count: { scorer_user_id: true },
-      orderBy: { _count: { scorer_user_id: "desc" } },
-      take: 5,
-    }),
+    mvpDoMes,
+    mvpsPorPartida,
+    proximaPartida,
+    aniversariantesDoMes,
+    caixa,
+  } = data;
 
-    // Top scorers of the season
-    prisma.goals.groupBy({
-      by: ["scorer_user_id"],
-      where: {
-        scorer_user_id: { not: null },
-        matches: {
-          match_date: {
-            gte: new Date(ano, 0, 1),
-            lte: new Date(ano, 11, 31, 23, 59, 59),
-          },
-          status: "completed",
-        },
-      },
-      _count: { scorer_user_id: true },
-      orderBy: { _count: { scorer_user_id: "desc" } },
-      take: 5,
-    }),
+  const { mes, ano } = periodo;
 
-    // Goalkeepers — fewest goals conceded
-    prisma.goals_conceded.groupBy({
-      by: ["conceder_user_id"],
-      where: {
-        conceder_user_id: { not: null },
-        matches: {
-          match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-          status: "completed",
-        },
-      },
-      _sum: { amount: true },
-      _count: { match_id: true },
-      orderBy: { _sum: { amount: "asc" } },
-      take: 3,
-    }),
-
-    // Most present players
-    prisma.match_players.groupBy({
-      by: ["user_id"],
-      where: {
-        user_id: { not: null },
-        matches: {
-          match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-          status: "completed",
-        },
-      },
-      _count: { match_id: true },
-      orderBy: { _count: { match_id: "desc" } },
-      take: 8,
-    }),
-
-    // MVP of the month (most votes across all matches)
-    prisma.mvp_votes.groupBy({
-      by: ["voted_user_id"],
-      where: {
-        matches: {
-          match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-        },
-      },
-      _count: { voted_user_id: true },
-      orderBy: { _count: { voted_user_id: "desc" } },
-      take: 1,
-    }),
-
-    // Next scheduled match
-    prisma.matches.findFirst({
-      where: { status: "scheduled", match_date: { gte: new Date() } },
-      orderBy: { match_date: "asc" },
-      include: { match_players: { select: { id: true } } },
-    }),
-
-    // All active users with birth dates
-    prisma.users.findMany({
-      where: { is_active: true, birth_date: { not: null } },
-      select: {
-        id: true,
-        name: true,
-        nickname: true,
-        photo_url: true,
-        birth_date: true,
-      },
-    }),
-
-    // Financial summary
-    Promise.all([
-      prisma.financial_transactions.aggregate({
-        _sum: { amount: true },
-        where: { type: "income" },
-      }),
-      prisma.financial_transactions.aggregate({
-        _sum: { amount: true },
-        where: { type: "expense" },
-      }),
-      prisma.financial_transactions.aggregate({
-        _sum: { amount: true },
-        where: {
-          type: "income",
-          reference_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-        },
-      }),
-      prisma.financial_transactions.aggregate({
-        _sum: { amount: true },
-        where: {
-          type: "expense",
-          reference_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-        },
-      }),
-    ]).then(([entradas, saidas, entradasMes, saidasMes]) => ({
-      saldo:
-        Number(entradas._sum.amount ?? 0) - Number(saidas._sum.amount ?? 0),
-      totalEntradas: Number(entradas._sum.amount ?? 0),
-      entradasMes: Number(entradasMes._sum.amount ?? 0),
-      saidasMes: Number(saidasMes._sum.amount ?? 0),
-    })),
-
-    // Completed matches with closed MVP sessions
-    prisma.matches.findMany({
-      where: {
-        status: "completed",
-        match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-        mvp_voting_sessions: { is_closed: true },
-      },
-      select: {
-        id: true,
-        match_date: true,
-        location: true,
-        mvp_votes: {
-          select: {
-            voted_user_id: true,
-            users_mvp_votes_voted_user_idTousers: {
-              select: { id: true, name: true, nickname: true, photo_url: true },
-            },
-          },
-        },
-      },
-      orderBy: { match_date: "desc" },
-    }),
-
-    // Total completed matches in the month
-    prisma.matches.count({
-      where: {
-        status: "completed",
-        match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
-      },
-    }),
-  ])
-
-  // ── Fetch player profiles in one batch ───────────────────────────────────
-  const allUserIds = [
-    ...artilheirosDoMesRaw.map((a) => a.scorer_user_id!),
-    ...artilheirosTemporadaRaw.map((a) => a.scorer_user_id!),
-    ...goleirosRaw.map((g) => g.conceder_user_id!),
-    ...presencasRaw.map((p) => p.user_id!),
-    ...(mvpRaw[0] ? [mvpRaw[0].voted_user_id] : []),
-  ]
-
-  const profiles = await prisma.users.findMany({
-    where: { id: { in: [...new Set(allUserIds)] } },
-    select: {
-      id: true,
-      name: true,
-      nickname: true,
-      photo_url: true,
-      position: true,
-    },
-  })
-  const pm = Object.fromEntries(profiles.map((p) => [p.id, p]))
-
-  // ── Process data ─────────────────────────────────────────────────────────
-  const artilheirosDoMes = artilheirosDoMesRaw.map((a) => ({
-    jogador: pm[a.scorer_user_id!] as PlayerProfile | undefined,
-    gols: a._count.scorer_user_id,
-  }))
-
-  const artilheirosTemporada = artilheirosTemporadaRaw.map((a) => ({
-    jogador: pm[a.scorer_user_id!] as PlayerProfile | undefined,
-    gols: a._count.scorer_user_id,
-  }))
-
-  const goleiros = goleirosRaw.map((g) => ({
-    jogador: pm[g.conceder_user_id!] as PlayerProfile | undefined,
-    totalGolsSofridos: Number(g._sum.amount ?? 0),
-    partidas: g._count.match_id,
-    mediaPorPartida:
-      g._count.match_id > 0
-        ? Math.round(
-            (Number(g._sum.amount ?? 0) / g._count.match_id) * 10
-          ) / 10
-        : 0,
-  }))
-
-  const presencas = presencasRaw.map((p) => ({
-    jogador: pm[p.user_id!] as PlayerProfile | undefined,
-    presencas: p._count.match_id,
+  const presencas = maisPresentesDoMes.map((p) => ({
+    ...p,
     percentual:
       totalPartidasDoMes > 0
-        ? Math.round((p._count.match_id / totalPartidasDoMes) * 100)
+        ? Math.round((p.presencas / totalPartidasDoMes) * 100)
         : 0,
-  }))
+  }));
 
-  const mvpDoMes = mvpRaw[0]
-    ? {
-        jogador: pm[mvpRaw[0].voted_user_id] as PlayerProfile | undefined,
-        votos: mvpRaw[0]._count.voted_user_id,
-      }
-    : null
-
-  // Birthday players for the current month
-  const aniversariantes = aniversariantesRaw
-    .filter(
-      (j) => j.birth_date && new Date(j.birth_date).getUTCMonth() === mes - 1
-    )
-    .map((j) => ({
-      ...j,
-      ehHoje: j.birth_date
-        ? new Date(j.birth_date).getUTCDate() === today.getDate() &&
-          new Date(j.birth_date).getUTCMonth() === today.getMonth()
-        : false,
-    }))
-    .sort((a, b) => {
-      const da = a.birth_date ? new Date(a.birth_date).getUTCDate() : 0
-      const db = b.birth_date ? new Date(b.birth_date).getUTCDate() : 0
-      return da - db
-    })
-
-  // Compute match-level MVPs from vote tallies
-  const partidasComMvp = partidasComMvpRaw.map((partida) => {
-    const tally: Record<
-      string,
-      {
-        votos: number
-        jogador: {
-          id: string
-          name: string
-          nickname: string | null
-          photo_url: string | null
-        }
-      }
-    > = {}
-
-    partida.mvp_votes.forEach((voto) => {
-      const id = voto.voted_user_id
-      if (!tally[id]) {
-        tally[id] = {
-          votos: 0,
-          jogador: voto.users_mvp_votes_voted_user_idTousers,
-        }
-      }
-      tally[id].votos++
-    })
-
-    const winner =
-      Object.values(tally).sort((a, b) => b.votos - a.votos)[0] ?? null
-
-    return {
-      data: partida.match_date,
-      local: partida.location,
-      mvp: winner?.jogador ?? null,
-      votos: winner?.votos ?? 0,
-    }
-  })
-
-  // Count individual match MVP wins for the monthly MVP player
   const mvpWins = mvpDoMes?.jogador
-    ? partidasComMvp.filter((p) => p.mvp?.id === mvpDoMes.jogador!.id).length
-    : 0
+    ? mvpsPorPartida.filter((p) => p.top3Mvps[0]?.jogador.id === mvpDoMes.jogador.id).length
+    : 0;
 
-  const monName = monthName(mes)
-  const monCap = monName.charAt(0).toUpperCase() + monName.slice(1)
+  const monName = monthName(mes);
+  const monCap = monName.charAt(0).toUpperCase() + monName.slice(1);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -953,8 +737,8 @@ export default async function DashboardPage() {
       {/* Row 2: MVP · Saldo · Aniversariantes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <MvpCard mvp={mvpDoMes} wins={mvpWins} mes={mes} />
-        <SaldoCard financeiro={financeiro} mes={mes} ano={ano} />
-        <AniversariantesCard aniversariantes={aniversariantes} mes={mes} />
+        <SaldoCard caixa={caixa} mes={mes} ano={ano} />
+        <AniversariantesCard aniversariantes={aniversariantesDoMes} mes={mes} />
       </div>
 
       {/* Row 3: Artilheiros Mês · Artilheiros Temporada · Goleiros */}
@@ -969,12 +753,12 @@ export default async function DashboardPage() {
           titulo={`Artilheiros · ${ano}`}
           iconType="target"
         />
-        <GoleirosCard data={goleiros} mes={mes} />
+        <GoleirosCard data={goleirosComMenosGols} mes={mes} />
       </div>
 
       {/* Row 4: Partidas com MVP · Presenças */}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
-        <PartidasMvpCard partidas={partidasComMvp} mes={mes} />
+        <PartidasMvpCard partidas={mvpsPorPartida} mes={mes} />
         <PresencasCard
           data={presencas}
           mes={mes}
@@ -982,5 +766,5 @@ export default async function DashboardPage() {
         />
       </div>
     </div>
-  )
+  );
 }
