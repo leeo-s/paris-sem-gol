@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +32,16 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Busca o perfil do usuário via API para verificar se é o primeiro acesso
+    const resposta = await fetch("/api/auth/me");
+    const perfilUsuario = resposta.ok ? await resposta.json() : null;
+
+    // Primeiro login: redireciona para cadastrar senha pessoal
+    if (!perfilUsuario?.first_login_at) {
+      router.push("/criar-senha");
+    } else {
+      router.push("/dashboard");
+    }
   }
 
   return (
@@ -56,9 +64,6 @@ export default function LoginPage() {
               PARIS <br className="hidden md:block" />
               SEM GOL
             </h2>
-            <p className="text-sidebar-foreground/60 text-sm mt-1.5">
-              Sua pelada, profissional.
-            </p>
           </div>
         </div>
 

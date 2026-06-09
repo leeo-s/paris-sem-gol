@@ -14,10 +14,11 @@ type SessionUser = {
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/dashboard/partidas": "Partidas",
-  "/dashboard/jogadores": "Jogadores",
   "/dashboard/classificacao": "Classificação",
   "/dashboard/torneios": "Torneios",
   "/dashboard/configuracoes": "Configurações",
+  "/jogadores": "Elenco",
+  "/jogadores/novo": "Novo Jogador",
 };
 
 const ROLE_LABELS: Record<string, string> = {

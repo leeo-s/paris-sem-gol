@@ -19,6 +19,7 @@ export async function getSessionUser() {
       email: true,
       role: true,
       photo_url: true,
+      first_login_at: true,
     },
   });
 }

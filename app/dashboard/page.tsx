@@ -549,9 +549,7 @@ function PartidasMvpCard({
                       <div
                         key={candidato.jogador.id}
                         className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 ${
-                          ehPrimeiro
-                            ? "bg-accent/15"
-                            : "bg-muted/40"
+                          ehPrimeiro ? "bg-accent/15" : "bg-muted/40"
                         }`}
                       >
                         {ehPrimeiro ? (
@@ -573,7 +571,10 @@ function PartidasMvpCard({
                           }`}
                         >
                           {ehPrimeiro && "MVP: "}
-                          {dName(candidato.jogador.name, candidato.jogador.nickname)}
+                          {dName(
+                            candidato.jogador.name,
+                            candidato.jogador.nickname,
+                          )}
                         </span>
                         <span className="text-xs text-muted-foreground ml-auto shrink-0">
                           {candidato.votos} votos
@@ -690,8 +691,6 @@ export default async function DashboardPage() {
     cache: "no-store",
   });
 
-  console.log("resposta dashboard: ", res);
-
   if (!res.ok) {
     throw new Error("Falha ao carregar dados do dashboard");
   }
@@ -723,7 +722,9 @@ export default async function DashboardPage() {
   }));
 
   const mvpWins = mvpDoMes?.jogador
-    ? mvpsPorPartida.filter((p) => p.top3Mvps[0]?.jogador.id === mvpDoMes.jogador.id).length
+    ? mvpsPorPartida.filter(
+        (p) => p.top3Mvps[0]?.jogador.id === mvpDoMes.jogador.id,
+      ).length
     : 0;
 
   const monName = monthName(mes);
