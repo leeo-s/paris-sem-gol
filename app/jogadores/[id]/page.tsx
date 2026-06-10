@@ -122,14 +122,16 @@ function formatarTelefone(phone: string | null): string {
   return phone;
 }
 
+// Formata a data de membro exibindo mês e ano, forçando UTC para evitar deslocamento de fuso
 function formatarDataMembro(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+  return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
+// Formata a data de pagamento em dd/mm/aaaa, forçando UTC para evitar deslocamento de fuso
 function formatarDataPagamento(dateStr: string | null): string {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("pt-BR");
+  return new Date(dateStr).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
 
 function formatarValor(amount: string): string {

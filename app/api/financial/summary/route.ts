@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
         const [
             totaisGerais,
+            totaisGlobais,
             entradasPorCategoria,
             saidasPorCategoria,
             mensalidadesPendentes,
@@ -32,6 +33,12 @@ export async function GET(request: NextRequest) {
                 where: { reference_date: { gte: inicioDoAno, lte: fimDoAno } },
                 _sum: { amount: true },
                 _count: { id: true },
+            }),
+
+            // Totais globais sem restrição de ano (saldo total histórico do clube)
+            prisma.financial_transactions.groupBy({
+                by: ['type'],
+                _sum: { amount: true },
             }),
 
             // Entradas detalhadas por categoria
@@ -76,13 +83,22 @@ export async function GET(request: NextRequest) {
             }),
         ])
 
-        // Calcula totais de entrada e saída
+        // Calcula totais de entrada e saída no ano
         const totalEntradas = Number(
             totaisGerais.find(t => t.type === 'income')?._sum.amount ?? 0
         )
         const totalSaidas = Number(
             totaisGerais.find(t => t.type === 'expense')?._sum.amount ?? 0
         )
+
+        // Calcula saldo histórico total (todos os anos)
+        const totalEntradasGlobal = Number(
+            totaisGlobais.find(t => t.type === 'income')?._sum.amount ?? 0
+        )
+        const totalSaidasGlobal = Number(
+            totaisGlobais.find(t => t.type === 'expense')?._sum.amount ?? 0
+        )
+        const saldoGlobal = totalEntradasGlobal - totalSaidasGlobal
 
         // Agrupa o resumo mês a mês
         const saldoPorMes: Record<number, { entradas: number; saidas: number; saldo: number }> = {}
@@ -106,6 +122,7 @@ export async function GET(request: NextRequest) {
             totalEntradas,
             totalSaidas,
             saldoAtual: totalEntradas - totalSaidas,
+            saldoGlobal,
             inadimplencia: {
                 total: Number(mensalidadesPendentes._sum.amount ?? 0),
                 quantidadeJogadores: mensalidadesPendentes._count.id,

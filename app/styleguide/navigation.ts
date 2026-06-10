@@ -24,6 +24,7 @@ export const navigation: NavSection[] = [
       { name: "Avatar", href: "/styleguide/components/avatar" },
       { name: "Table", href: "/styleguide/components/table" },
       { name: "Progress", href: "/styleguide/components/progress" },
+      { name: "Datalist Input", href: "/styleguide/components/datalist-input" },
     ],
   },
 ]

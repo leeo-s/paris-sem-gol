@@ -8,6 +8,7 @@ import { buscarPerfilUsuario, ehAdminOuCoAdmin } from "../_lib/auth";
 import { tratarErroPrisma } from "../_lib/prisma-errors";
 
 // GET /api/users — lista jogadores com filtros, busca e paginação
+// Aceita ?all=true para retornar todos os usuários ativos sem paginação (usado em selects do sistema)
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -20,6 +21,23 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = request.nextUrl;
+
+    // Modo simplificado: retorna todos os usuários ativos como {id, name} sem paginação
+    if (searchParams.get("all") === "true") {
+      const todosUsuarios = await prisma.users.findMany({
+        where: { is_active: true },
+        select: { id: true, name: true, nickname: true },
+        orderBy: { name: "asc" },
+      });
+
+      const usuariosFormatados = todosUsuarios.map((usuario) => ({
+        id: usuario.id,
+        name: usuario.nickname ?? usuario.name,
+      }));
+
+      return NextResponse.json(usuariosFormatados);
+    }
+
     const filtroRole = searchParams.get("role") ?? undefined;
     const filtroPosition = searchParams.get("position") ?? undefined;
     const filtroGoalkeeper = searchParams.get("is_goalkeeper");

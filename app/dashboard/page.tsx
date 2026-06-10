@@ -280,9 +280,6 @@ function SaldoCard({
 
         <p className="text-xs text-muted-foreground mt-1.5 mb-3">
           {monCap} {ano}
-          {caixa.totalEntradas > 0 && (
-            <> · Caixa total: {fmt(caixa.totalEntradas)}</>
-          )}
         </p>
 
         <div className="flex flex-wrap gap-2">
