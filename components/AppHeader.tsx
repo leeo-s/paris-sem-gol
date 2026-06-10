@@ -16,9 +16,10 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/partidas": "Partidas",
   "/dashboard/classificacao": "Classificação",
   "/dashboard/torneios": "Torneios",
-  "/dashboard/configuracoes": "Configurações",
   "/jogadores": "Elenco",
   "/jogadores/novo": "Novo Jogador",
+  "/financeiro": "Financeiro",
+  "/configuration": "Configurações",
 };
 
 const ROLE_LABELS: Record<string, string> = {

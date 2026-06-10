@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { club_name, monthly_fee, guest_fee, bbq_member_fee, bbq_guest_fee, jersey_price } = body
+        const { club_name, monthly_fee, guest_fee, bbq_member_fee, bbq_guest_fee, jersey_price, local, time } = body
 
         const configuracoes = await prisma.club_settings.findFirst()
         if (!configuracoes) {
@@ -60,6 +60,14 @@ export async function PATCH(request: NextRequest) {
             }
         }
 
+        // Converte "HH:MM" para um objeto Date com data epoch para o campo Time do Postgres
+        function horarioParaDate(horario: string): Date {
+            const [horas, minutos] = horario.split(':').map(Number)
+            const data = new Date(0)
+            data.setUTCHours(horas, minutos, 0, 0)
+            return data
+        }
+
         const dadosParaAtualizar: Record<string, unknown> = { updated_at: new Date() }
         if (club_name !== undefined) dadosParaAtualizar.club_name = club_name
         if (monthly_fee !== undefined) dadosParaAtualizar.monthly_fee = monthly_fee
@@ -67,6 +75,8 @@ export async function PATCH(request: NextRequest) {
         if (bbq_member_fee !== undefined) dadosParaAtualizar.bbq_member_fee = bbq_member_fee
         if (bbq_guest_fee !== undefined) dadosParaAtualizar.bbq_guest_fee = bbq_guest_fee
         if (jersey_price !== undefined) dadosParaAtualizar.jersey_price = jersey_price
+        if (local !== undefined) dadosParaAtualizar.local = local
+        if (time !== undefined) dadosParaAtualizar.time = horarioParaDate(time)
 
         const configuracoesAtualizadas = await prisma.club_settings.update({
             where: { id: configuracoes.id },
