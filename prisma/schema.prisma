@@ -203,6 +203,7 @@ model matches {
   tournament_id       String?              @db.Uuid
   created_by          String               @db.Uuid
   created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  time                DateTime             @default(dbgenerated("'09:00:00'::time without time zone")) @db.Time(6)
   goals               goals[]
   goals_conceded      goals_conceded[]
   match_players       match_players[]

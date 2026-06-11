@@ -135,7 +135,7 @@ export async function PATCH(
     }
 }
 
-// DELETE /api/matches/:id — cancela e remove uma partida (cascade no banco)
+// DELETE /api/matches/:id — remove uma partida, mas apenas se ainda não foi iniciada
 export async function DELETE(
     _request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -154,6 +154,24 @@ export async function DELETE(
         }
 
         const { id } = await params
+
+        // Verifica se a partida existe e se ainda não foi iniciada
+        const partidaExistente = await prisma.matches.findUnique({
+            where: { id },
+            select: { id: true, status: true },
+        })
+
+        if (!partidaExistente) {
+            return NextResponse.json({ error: 'Partida não encontrada' }, { status: 404 })
+        }
+
+        // Somente partidas com status "scheduled" (não iniciadas) podem ser excluídas
+        if (partidaExistente.status !== 'scheduled') {
+            return NextResponse.json(
+                { error: 'Não é possível excluir uma partida que já foi iniciada ou encerrada' },
+                { status: 422 }
+            )
+        }
 
         await prisma.matches.delete({ where: { id } })
 

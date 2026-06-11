@@ -19,6 +19,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/jogadores": "Elenco",
   "/jogadores/novo": "Novo Jogador",
   "/financeiro": "Financeiro",
+  "/partidas": "Partidas",
+  "/partidas/nova": "Nova Partida",
   "/configuration": "Configurações",
 };
 
@@ -41,7 +43,11 @@ function getInitials(name: string): string {
 export function AppHeader({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
 
-  const title = PAGE_TITLES[pathname] ?? "Dashboard";
+  const title =
+    PAGE_TITLES[pathname] ??
+    (pathname.startsWith("/partidas/") ? "Partidas" : null) ??
+    (pathname.startsWith("/jogadores/") ? "Elenco" : null) ??
+    "Dashboard";
   const now = new Date();
   const month = now.toLocaleDateString("pt-BR", { month: "long" });
   const monthYear = `${month.charAt(0).toUpperCase() + month.slice(1)} ${now.getFullYear()}`;
