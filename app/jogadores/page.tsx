@@ -516,13 +516,16 @@ export default function ElencoPage() {
                         >
                           Ver perfil
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(`/jogadores/${j.id}/editar`)
-                          }
-                        >
-                          Editar dados
-                        </DropdownMenuItem>
+                        {ehAdmin && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              router.push(`/jogadores/${j.id}/editar`)
+                            }
+                          >
+                            Editar dados
+                          </DropdownMenuItem>
+                        )}
+
                         {ehAdmin && (
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"

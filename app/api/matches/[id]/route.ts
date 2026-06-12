@@ -45,6 +45,13 @@ export async function GET(
                         guest_players: { select: { id: true, name: true } },
                     },
                 },
+                mvp_votes: {
+                    include: {
+                        users_mvp_votes_voted_user_idTousers: {
+                            select: { id: true, name: true, nickname: true },
+                        },
+                    },
+                },
                 mvp_voting_sessions: true,
             },
         })
@@ -53,7 +60,14 @@ export async function GET(
             return NextResponse.json({ error: 'Partida não encontrada' }, { status: 404 })
         }
 
-        return NextResponse.json(partida)
+        const partidaSerializada = {
+            ...partida,
+            time: partida.time
+                ? `${String(partida.time.getUTCHours()).padStart(2, '0')}:${String(partida.time.getUTCMinutes()).padStart(2, '0')}:${String(partida.time.getUTCSeconds()).padStart(2, '0')}`
+                : null,
+        }
+
+        return NextResponse.json(partidaSerializada)
     } catch (error) {
         console.error('[GET /api/matches/:id]', error)
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
@@ -82,7 +96,7 @@ export async function PATCH(
         const body = await request.json()
         const { status, location, match_date } = body
 
-        const statusValidos = ['scheduled', 'completed', 'cancelled']
+        const statusValidos = ['scheduled', 'started', 'completed', 'cancelled']
         if (status && !statusValidos.includes(status)) {
             return NextResponse.json({ error: `Status inválido. Use: ${statusValidos.join(', ')}` }, { status: 400 })
         }

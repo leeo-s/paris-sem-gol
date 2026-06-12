@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/config/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import Image from "next/image";
+import { Avatar } from "@/components/ui/avatar";
 import {
   Lock,
   Eye,
@@ -44,7 +45,6 @@ export default function CriarSenhaPage() {
   const [erroSessao, setErroSessao] = useState<string | null>(null);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Autentica o usuário assim que a página carrega.
   // Suporta dois modos: link de email (tokens no hash) ou primeiro login (sessão já ativa).
@@ -169,10 +169,14 @@ export default function CriarSenhaPage() {
 
         <div className="relative z-10 flex flex-col items-center gap-4">
           <Avatar className="size-20 md:size-24 after:hidden">
-            <AvatarImage src="/logo.png" alt="Paris Sem Gol" />
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground font-heading text-xl">
-              PSG
-            </AvatarFallback>
+            <Image
+              src="/logo.png"
+              alt="Paris Sem Gol"
+              width={96}
+              height={96}
+              className="aspect-square size-full rounded-full object-cover"
+              priority
+            />
           </Avatar>
           <div className="text-center">
             <h2 className="font-heading text-4xl md:text-5xl text-sidebar-foreground tracking-wider leading-tight">

@@ -65,7 +65,7 @@ export async function POST(
 
         const { id: matchId } = await params
         const body = await request.json()
-        const { user_id, guest_player_id, is_goalkeeper } = body
+        const { user_id, guest_player_id, is_goalkeeper, confirmed } = body
 
         if (!user_id && !guest_player_id) {
             return NextResponse.json({ error: 'Informe user_id ou guest_player_id' }, { status: 400 })
@@ -88,18 +88,37 @@ export async function POST(
             )
         }
 
-        const novaPresenca = await prisma.match_players.create({
-            data: {
-                match_id: matchId,
-                user_id: user_id ?? null,
-                guest_player_id: guest_player_id ?? null,
-                is_goalkeeper: is_goalkeeper ?? false,
-            },
-            include: {
-                users: { select: { id: true, name: true, nickname: true, is_goalkeeper: true } },
-                guest_players: { select: { id: true, name: true } },
-            },
-        })
+        // Para membros usa upsert para lidar com a unique constraint (match_id, user_id)
+        const novaPresenca = user_id
+            ? await prisma.match_players.upsert({
+                where: { match_id_user_id: { match_id: matchId, user_id } },
+                create: {
+                    match_id: matchId,
+                    user_id,
+                    is_goalkeeper: is_goalkeeper ?? false,
+                    confirmed: confirmed ?? false,
+                },
+                update: {
+                    confirmed: confirmed ?? false,
+                    is_goalkeeper: is_goalkeeper ?? false,
+                },
+                include: {
+                    users: { select: { id: true, name: true, nickname: true, is_goalkeeper: true } },
+                    guest_players: { select: { id: true, name: true } },
+                },
+            })
+            : await prisma.match_players.create({
+                data: {
+                    match_id: matchId,
+                    guest_player_id: guest_player_id ?? null,
+                    is_goalkeeper: is_goalkeeper ?? false,
+                    confirmed: confirmed ?? false,
+                },
+                include: {
+                    users: { select: { id: true, name: true, nickname: true, is_goalkeeper: true } },
+                    guest_players: { select: { id: true, name: true } },
+                },
+            })
 
         return NextResponse.json(novaPresenca, { status: 201 })
     } catch (error) {

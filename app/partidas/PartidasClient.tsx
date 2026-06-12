@@ -15,6 +15,8 @@ import {
   Clock,
   Save,
   Trash2,
+  Shuffle,
+  Vote,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,7 +43,7 @@ function extrairHorario(timeValue: string | null): string {
 
 // ─── tipos ────────────────────────────────────────────────────────────────────
 
-type MatchStatus = "scheduled" | "completed" | "cancelled";
+type MatchStatus = "scheduled" | "started" | "completed" | "cancelled";
 
 type GoalEntry = {
   id: string;
@@ -94,7 +96,7 @@ type Partida = {
   mvp_votes: MvpVoteEntry[];
 };
 
-type FiltroTab = "todas" | "em_aberto" | "encerradas";
+type FiltroTab = "todas" | "em_aberto" | "em_andamento" | "encerradas";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -240,11 +242,21 @@ function contarConfirmados(players: Partida["match_players"]): number {
 
 // ─── sub-componentes ──────────────────────────────────────────────────────────
 
+// Exibe o badge colorido de acordo com o status da partida
 function BadgeStatus({ status }: { status: MatchStatus }) {
   if (status === "scheduled") {
     return (
       <span className="inline-flex items-center rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning-foreground border border-warning/30">
         Em Aberto
+      </span>
+    );
+  }
+  if (status === "started") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-700 dark:text-green-400 border border-green-500/30">
+        {/* Ponto pulsante indicando partida ao vivo */}
+        <span className="size-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+        Em Andamento
       </span>
     );
   }
@@ -338,8 +350,8 @@ function CartaoAberta({
                   href={`/partidas/${partida.id}/iniciar`}
                   className={buttonVariants({ size: "sm" })}
                 >
-                  <Play className="size-3.5" />
-                  Iniciar Partida
+                  <Shuffle className="size-3.5" />
+                  Sortear Times
                 </Link>
               )}
               {ehAdmin && (
@@ -397,8 +409,8 @@ function CartaoAberta({
                 href={`/partidas/${partida.id}/iniciar`}
                 className={buttonVariants({ size: "sm", className: "flex-1" })}
               >
-                <Play className="size-3.5" />
-                Iniciar Partida
+                <Shuffle className="size-3.5" />
+                Sortear Times
               </Link>
             )}
             {ehAdmin && (
@@ -429,12 +441,179 @@ function CartaoAberta({
   );
 }
 
-function CartaoEncerrada({ partida }: { partida: Partida }) {
+// Cartão para partidas com status "started" — exibe destaque ao vivo e ação de acompanhar
+function CartaoEmAndamento({
+  partida,
+  ehAdmin,
+  onRequestExcluir,
+  onRequestEditar,
+}: {
+  partida: Partida;
+  ehAdmin: boolean;
+  onRequestExcluir: (id: string) => void;
+  onRequestEditar: (partida: Partida) => void;
+}) {
+  const { dia, mes } = formatDateBadge(partida.match_date);
+  const dataCurta = formatDateShort(partida.match_date);
+  const confirmados = contarConfirmados(partida.match_players);
+
+  return (
+    <Link href={`/partidas/${partida.id}`} className="block group">
+      <div className="bg-card rounded-xl ring-1 ring-foreground/10 border-l-4 border-l-green-500 overflow-hidden transition-shadow hover:shadow-md">
+        {/* Desktop layout */}
+        <div className="hidden md:flex items-start gap-4 p-4">
+          {/* Badge de data com fundo verde para indicar ao vivo */}
+          <div className="flex flex-col items-center justify-center bg-green-600 text-white rounded-lg w-12 h-12 shrink-0">
+            <span className="font-heading text-xl leading-none">{dia}</span>
+            <span className="text-[9px] uppercase tracking-wider opacity-80">
+              {mes}
+            </span>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-heading text-base tracking-wide text-foreground">
+                  Fut Semanal
+                </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="size-3 shrink-0" />
+                    {dataCurta + " - " + formatarHorario(partida.time)}
+                  </span>
+                  {partida.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3 shrink-0" />
+                      {partida.location}
+                    </span>
+                  )}
+                  {confirmados > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Users className="size-3 shrink-0" />
+                      {confirmados} confirmados
+                    </span>
+                  )}
+                </div>
+              </div>
+              <BadgeStatus status={partida.status} />
+            </div>
+
+            {/* Ações — botão de acompanhar em destaque + editar/excluir para admin */}
+            <div
+              className="flex items-center gap-2 mt-3"
+              onClick={(e) => e.preventDefault()}
+            >
+              <Link
+                href={`/partidas/${partida.id}`}
+                className={buttonVariants({ size: "sm" })}
+              >
+                <Play className="size-3.5" />
+                Acompanhar Partida
+              </Link>
+              {ehAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRequestEditar(partida)}
+                >
+                  <Pencil className="size-3.5" />
+                  Editar
+                </Button>
+              )}
+              {ehAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => onRequestExcluir(partida.id)}
+                >
+                  <Trash2 className="size-3.5" />
+                  Excluir
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile layout */}
+        <div className="md:hidden p-4 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-heading text-base tracking-wide text-foreground">
+                Fut Semanal
+              </p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-muted-foreground w-50">
+                <span>{dataCurta + " - " + formatarHorario(partida.time)}</span>
+                {partida.location && (
+                  <>
+                    <span>·</span>
+                    <span>{partida.location}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <BadgeStatus status={partida.status} />
+          </div>
+
+          {/* Ações mobile */}
+          <div
+            className="flex flex-wrap items-center gap-2"
+            onClick={(e) => e.preventDefault()}
+          >
+            <Link
+              href={`/partidas/${partida.id}`}
+              className={buttonVariants({ size: "sm", className: "flex-1" })}
+            >
+              <Play className="size-3.5" />
+              Acompanhar
+            </Link>
+            {ehAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={() => onRequestEditar(partida)}
+              >
+                <Pencil className="size-3.5" />
+                Editar
+              </Button>
+            )}
+            {ehAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => onRequestExcluir(partida.id)}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function CartaoEncerrada({
+  partida,
+  currentUserId,
+}: {
+  partida: Partida;
+  currentUserId: string | null;
+}) {
   const dataCompleta = formatDateFull(partida.match_date);
   const artilheiro = calcularArtilheiro(partida.goals);
   const melhorGoleiro = calcularMelhorGoleiro(partida.goals_conceded);
   const mvp = calcularMvp(partida.mvp_votes);
   const temEstatisticas = artilheiro || melhorGoleiro || mvp;
+
+  // Exibe o botão de votação se a sessão estiver aberta e o usuário tiver participado
+  const podeVotarMvp =
+    currentUserId !== null &&
+    partida.mvp_voting_sessions !== null &&
+    !partida.mvp_voting_sessions.is_closed &&
+    partida.match_players.some((p) => p.user_id === currentUserId);
 
   return (
     <Link href={`/partidas/${partida.id}`} className="block group">
@@ -514,6 +693,22 @@ function CartaoEncerrada({ partida }: { partida: Partida }) {
             </p>
           </div>
         )}
+
+        {/* Botão de votação — visível apenas para quem participou e a sessão está aberta */}
+        {podeVotarMvp && (
+          <div
+            className="border-t border-border px-4 py-3"
+            onClick={(e) => e.preventDefault()}
+          >
+            <Link
+              href={`/partidas/${partida.id}/votacao`}
+              className={buttonVariants({ size: "sm" })}
+            >
+              <Star className="size-3.5" />
+              Votar MVP
+            </Link>
+          </div>
+        )}
       </div>
     </Link>
   );
@@ -524,10 +719,17 @@ function CartaoEncerrada({ partida }: { partida: Partida }) {
 const TABS: { label: string; value: FiltroTab }[] = [
   { label: "Todas", value: "todas" },
   { label: "Em Aberto", value: "em_aberto" },
+  { label: "Em Andamento", value: "em_andamento" },
   { label: "Encerradas", value: "encerradas" },
 ];
 
-export function PartidasClient({ ehAdmin }: { ehAdmin: boolean }) {
+export function PartidasClient({
+  ehAdmin,
+  currentUserId,
+}: {
+  ehAdmin: boolean;
+  currentUserId: string | null;
+}) {
   const [filtro, setFiltro] = useState<FiltroTab>("todas");
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -698,8 +900,17 @@ export function PartidasClient({ ehAdmin }: { ehAdmin: boolean }) {
     buscarPartidas();
   }, [buscarPartidas]);
 
+  // Partidas aguardando início, ordenadas por data crescente
   const abertas = partidas
     .filter((p) => p.status === "scheduled")
+    .sort(
+      (a, b) =>
+        new Date(a.match_date).getTime() - new Date(b.match_date).getTime(),
+    );
+
+  // Partidas que já começaram mas ainda não foram encerradas
+  const emAndamento = partidas
+    .filter((p) => p.status === "started")
     .sort(
       (a, b) =>
         new Date(a.match_date).getTime() - new Date(b.match_date).getTime(),
@@ -710,6 +921,7 @@ export function PartidasClient({ ehAdmin }: { ehAdmin: boolean }) {
   );
 
   const mostrarAbertas = filtro === "todas" || filtro === "em_aberto";
+  const mostrarEmAndamento = filtro === "todas" || filtro === "em_andamento";
   const mostrarEncerradas = filtro === "todas" || filtro === "encerradas";
 
   return (
@@ -997,6 +1209,29 @@ export function PartidasClient({ ehAdmin }: { ehAdmin: boolean }) {
             </section>
           )}
 
+          {/* Seção Em Andamento */}
+          {mostrarEmAndamento && emAndamento.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 rounded-full bg-green-500 animate-pulse" />
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Em Andamento
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {emAndamento.map((p) => (
+                  <CartaoEmAndamento
+                    key={p.id}
+                    partida={p}
+                    ehAdmin={ehAdmin}
+                    onRequestExcluir={solicitarExclusao}
+                    onRequestEditar={abrirModalEdicao}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Seção Encerradas */}
           {mostrarEncerradas && (
             <section className="space-y-3">
@@ -1014,7 +1249,11 @@ export function PartidasClient({ ehAdmin }: { ehAdmin: boolean }) {
               ) : (
                 <div className="space-y-3">
                   {encerradas.map((p) => (
-                    <CartaoEncerrada key={p.id} partida={p} />
+                    <CartaoEncerrada
+                      key={p.id}
+                      partida={p}
+                      currentUserId={currentUserId}
+                    />
                   ))}
                 </div>
               )}

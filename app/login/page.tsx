@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createBrowserSupabaseClient } from "@/config/supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import Image from "next/image";
+import logoImg from "@/public/logo.png";
+import { Avatar } from "@/components/ui/avatar";
 import { Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,8 +16,22 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verificandoSessao, setVerificandoSessao] = useState(true);
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
+
+  // Redireciona para o dashboard se já houver uma sessão ativa válida
+  useEffect(() => {
+    async function verificarSessaoAtiva() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        router.replace("/dashboard");
+      } else {
+        setVerificandoSessao(false);
+      }
+    }
+    verificarSessaoAtiva();
+  }, []);
 
   async function handleLogin() {
     setLoading(true);
@@ -44,6 +60,9 @@ export default function LoginPage() {
     }
   }
 
+  // Evita piscar o formulário enquanto a sessão é verificada
+  if (verificandoSessao) return null;
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Branding panel */}
@@ -54,10 +73,12 @@ export default function LoginPage() {
 
         <div className="relative z-10 flex flex-col items-center gap-4">
           <Avatar className="size-20 md:size-24 after:hidden">
-            <AvatarImage src="/logo.png" alt="Paris Sem Gol" />
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground font-heading text-xl">
-              PSG
-            </AvatarFallback>
+            <Image
+              src={logoImg}
+              alt="Paris Sem Gol"
+              className="aspect-square size-full rounded-full object-cover"
+              priority
+            />
           </Avatar>
           <div className="text-center">
             <h2 className="font-heading text-4xl md:text-5xl text-sidebar-foreground tracking-wider leading-tight">

@@ -52,14 +52,33 @@ function extrairHorario(timeStr: string | null | undefined): string {
   }
 }
 
-function formatarMoeda(valor: string | number): string {
-  const num = typeof valor === "string" ? parseFloat(valor) : valor;
-  if (isNaN(num)) return "";
-  return num.toFixed(2).replace(".", ",");
+function formatarValor(digitos: string): string {
+  if (!digitos) return "";
+  const padded = digitos.padStart(3, "0");
+  const intPart = parseInt(padded.slice(0, -2), 10).toString();
+  return `${intPart},${padded.slice(-2)}`;
 }
 
-function parseMoeda(valor: string): number {
-  return parseFloat(valor.replace(",", ".")) || 0;
+function valorParaDigitos(valor: string | number): string {
+  const num = typeof valor === "string" ? parseFloat(valor) : valor;
+  if (isNaN(num) || num === 0) return "";
+  return Math.round(num * 100).toString();
+}
+
+function criarHandlerTecla(
+  setter: React.Dispatch<React.SetStateAction<string>>,
+) {
+  return (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault();
+      setter((prev) => (prev.length < 10 ? prev + e.key : prev));
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      setter((prev) => prev.slice(0, -1));
+    } else if (!["Tab", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
 }
 
 // ─── itens do menu lateral ────────────────────────────────────────────────────
@@ -102,8 +121,8 @@ export default function ConfiguracaoPage() {
       const dados: ConfiguracaoClube = await resp.json();
       setConfig(dados);
       setNomeClube(dados.club_name ?? "");
-      setMensalidade(formatarMoeda(dados.monthly_fee));
-      setTaxaConvidado(formatarMoeda(dados.guest_fee));
+      setMensalidade(valorParaDigitos(dados.monthly_fee));
+      setTaxaConvidado(valorParaDigitos(dados.guest_fee));
       setLocal(dados.local ?? "");
       setHorario(extrairHorario(dados.time));
     } catch {
@@ -165,8 +184,8 @@ export default function ConfiguracaoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           club_name: nomeClube,
-          monthly_fee: parseMoeda(mensalidade),
-          guest_fee: parseMoeda(taxaConvidado),
+          monthly_fee: Number(mensalidade) / 100,
+          guest_fee: Number(taxaConvidado) / 100,
           local,
           time: horario,
         }),
@@ -352,14 +371,13 @@ export default function ConfiguracaoPage() {
                       </span>
                       <Input
                         id="mensalidade"
-                        value={mensalidade}
-                        onChange={(e) => setMensalidade(e.target.value)}
-                        onBlur={() =>
-                          setMensalidade(formatarMoeda(parseMoeda(mensalidade)))
-                        }
-                        placeholder="30,00"
+                        type="text"
+                        inputMode="numeric"
+                        value={formatarValor(mensalidade)}
+                        onKeyDown={criarHandlerTecla(setMensalidade)}
+                        onChange={() => {}}
+                        placeholder="0,00"
                         className="h-11 pl-9"
-                        inputMode="decimal"
                       />
                     </div>
                   </div>
@@ -383,16 +401,13 @@ export default function ConfiguracaoPage() {
                       </span>
                       <Input
                         id="taxa-convidado"
-                        value={taxaConvidado}
-                        onChange={(e) => setTaxaConvidado(e.target.value)}
-                        onBlur={() =>
-                          setTaxaConvidado(
-                            formatarMoeda(parseMoeda(taxaConvidado)),
-                          )
-                        }
-                        placeholder="15,00"
+                        type="text"
+                        inputMode="numeric"
+                        value={formatarValor(taxaConvidado)}
+                        onKeyDown={criarHandlerTecla(setTaxaConvidado)}
+                        onChange={() => {}}
+                        placeholder="0,00"
                         className="h-11 pl-9"
-                        inputMode="decimal"
                       />
                     </div>
                   </div>

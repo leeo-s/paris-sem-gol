@@ -19,6 +19,10 @@ export default async function ConfigurationLayout({
 
   const sessionUser = await getSessionUser();
 
+  if (!sessionUser || (sessionUser.role !== "admin" && sessionUser.role !== "co_admin")) {
+    redirect("/dashboard");
+  }
+
   return (
     <SidebarProvider
       style={{ "--sidebar-width": "11rem" } as React.CSSProperties}

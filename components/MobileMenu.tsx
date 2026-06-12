@@ -38,7 +38,7 @@ const navItems = [
 
 // Itens do rodapé que não precisam de lógica especial
 const itensRodapePadrao = [
-  { title: "Configurações", href: "/configuracoes", icon: Settings },
+  { title: "Configurações", href: "/configuration", icon: Settings },
 ];
 
 type SessionUser = {
@@ -161,7 +161,9 @@ export function MobileMenu({ open, onOpenChange, user }: MobileMenuProps) {
               >
                 <User
                   className="size-4 shrink-0"
-                  strokeWidth={pathname === `/jogadores/${user.id}` ? 2.5 : 1.75}
+                  strokeWidth={
+                    pathname === `/jogadores/${user.id}` ? 2.5 : 1.75
+                  }
                 />
                 Perfil
               </span>

@@ -115,6 +115,9 @@ model guest_players {
   id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                   String                   @db.VarChar(120)
   phone                  String?                  @db.VarChar(20)
+  position               String?                  @db.VarChar(40)
+  is_goalkeeper          Boolean                  @default(false)
+  overall                Int                      @default(5) @db.SmallInt
   linked_user_id         String?                  @db.Uuid
   created_at             DateTime                 @default(now()) @db.Timestamptz(6)
   event_attendees        event_attendees[]
@@ -405,6 +408,7 @@ enum match_status {
   scheduled
   completed
   cancelled
+  started
 }
 
 enum payment_status {

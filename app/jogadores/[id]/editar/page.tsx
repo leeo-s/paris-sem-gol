@@ -268,6 +268,15 @@ export default function EditarJogadorPage() {
     carregarDados();
   }, [carregarDados]);
 
+  useEffect(() => {
+    if (carregando) return;
+    const ehGestorLocal = sessao?.role === "admin" || sessao?.role === "co_admin";
+    const ehProprioJogadorLocal = sessao?.id === id;
+    if (!ehProprioJogadorLocal && !ehGestorLocal) {
+      router.replace(`/jogadores/${id}`);
+    }
+  }, [carregando, sessao, id, router]);
+
   function atualizar<K extends keyof FormState>(campo: K, valor: FormState[K]) {
     setForm((f) => ({ ...f, [campo]: valor }));
   }
@@ -407,23 +416,7 @@ export default function EditarJogadorPage() {
   const overall = calcularOverall(form);
   const gkSelecionado = form.position === "GK";
 
-  // Redireciona se o usuário não tem permissão para editar
-  if (!ehProprioJogador && !ehGestor) {
-    return (
-      <div className="max-w-3xl mx-auto space-y-4">
-        <Link
-          href={`/jogadores/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Perfil
-        </Link>
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          Você não tem permissão para editar este perfil.
-        </div>
-      </div>
-    );
-  }
+  if (!ehProprioJogador && !ehGestor) return null;
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-8">

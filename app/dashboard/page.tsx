@@ -3,14 +3,11 @@ import { headers } from "next/headers";
 import { createServerSupabaseClient } from "@/config/supabase/server";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { cn } from "@/lib/utils";
+import { ProximaPartidaCard } from "./ProximaPartidaCard";
 import {
-  MapPin,
-  Users2,
-  CheckCircle,
   Trophy,
   Cake,
   Flame,
@@ -85,10 +82,12 @@ type DashboardData = {
     top3Mvps: Array<{ jogador: PlayerProfile; votos: number }>;
   }>;
   proximaPartida: {
+    id: string;
     match_date: string;
     location: string | null;
     status: string;
-    match_players: { id: string }[];
+    usuarioPodeConfirmar: boolean;
+    usuarioJaConfirmou: boolean;
   } | null;
   aniversariantesDoMes: Array<{
     id: string;
@@ -108,93 +107,6 @@ type DashboardData = {
 };
 
 // ─── sub-components ───────────────────────────────────────────────────────────
-
-function ProximaPartidaCard({
-  match,
-}: {
-  match: DashboardData["proximaPartida"];
-}) {
-  if (!match) {
-    return (
-      <Card className="bg-primary text-primary-foreground border-none">
-        <CardContent className="p-5">
-          <p className="text-[10px] uppercase tracking-widest text-primary-foreground/50 mb-1">
-            Próxima Partida
-          </p>
-          <p className="text-sm text-primary-foreground/70">
-            Nenhuma partida agendada
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const d = new Date(match.match_date);
-  const day = d.getUTCDate().toString().padStart(2, "0");
-  const mon = monthAbbr(d.getUTCMonth() + 1);
-  //const playerCount = match.match_players.length
-
-  return (
-    <Card className="bg-primary text-primary-foreground border-none">
-      <CardContent className="p-4 md:p-5">
-        <div className="flex items-center gap-4">
-          {/* Date box */}
-          <div className="flex flex-col items-center justify-center rounded-xl bg-sidebar-accent px-4 py-2.5 shrink-0 min-w-[60px] text-center">
-            <span className="font-heading text-3xl leading-none text-primary-foreground">
-              {day}
-            </span>
-            <span className="text-[10px] uppercase tracking-wide text-primary-foreground/70 mt-0.5">
-              {mon}
-            </span>
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-0.5">
-              <p className="text-[10px] uppercase tracking-widest text-primary-foreground/50">
-                Próxima Partida
-              </p>
-              {/* <Badge className="bg-accent text-accent-foreground text-[10px] shrink-0">
-                Em Aberto
-              </Badge> */}
-            </div>
-            <h2 className="font-heading text-xl md:text-2xl leading-tight text-primary-foreground">
-              Pelada Semanal
-            </h2>
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              {match.location && (
-                <span className="flex items-center gap-1 text-xs text-primary-foreground/60">
-                  <MapPin className="size-3" />
-                  {match.location}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Desktop button */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="hidden sm:flex bg-gold border-gold text-gold-foreground hover:bg-gold/90 hover:text-gold-foreground gap-1.5 shrink-0"
-          >
-            <CheckCircle className="size-3.5" />
-            Confirmar Presença
-          </Button>
-        </div>
-
-        {/* Mobile button */}
-        <Button
-          size="sm"
-          variant="outline"
-          className="sm:hidden mt-3 w-full bg-gold border-gold text-gold-foreground hover:bg-gold/90 hover:text-gold-foreground gap-1.5"
-        >
-          <CheckCircle className="size-3.5" />
-          Confirmar Presença
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
 
 function MvpCard({
   mvp,

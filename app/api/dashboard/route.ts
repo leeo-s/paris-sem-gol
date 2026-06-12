@@ -114,10 +114,16 @@ export async function GET(request: NextRequest) {
         take: 1,
       }),
 
-      // Próxima partida agendada
+      // Próxima partida agendada — inclui presença do usuário logado, se já confirmada
       prisma.matches.findFirst({
         where: { status: "scheduled", match_date: { gte: new Date() } },
         orderBy: { match_date: "asc" },
+        include: {
+          match_players: {
+            where: { user_id: user.id },
+            select: { id: true },
+          },
+        },
       }),
 
       // Aniversariantes do mês com destaque para o dia atual
@@ -203,6 +209,30 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
+
+    // Determina se o usuário logado pode confirmar presença e se já confirmou
+    let usuarioPodeConfirmar = false
+    const usuarioJaConfirmou = !!(proximaPartida?.match_players?.[0])
+
+    if (proximaPartida) {
+      const dataPartida = new Date(proximaPartida.match_date)
+      const mesPartida = dataPartida.getUTCMonth() + 1
+      const anoPartida = dataPartida.getUTCFullYear()
+
+      // Busca perfil e convocatória do usuário para o mês da partida em paralelo
+      const [perfilUsuario, entradaConvocatoria] = await Promise.all([
+        prisma.users.findUnique({
+          where: { id: user.id },
+          select: { is_goalkeeper: true },
+        }),
+        prisma.monthly_roster.findFirst({
+          where: { user_id: user.id, month: mesPartida, year: anoPartida, status: 'active' },
+        }),
+      ])
+
+      // Goleiros podem participar de qualquer partida; os demais precisam da convocatória ativa
+      usuarioPodeConfirmar = perfilUsuario?.is_goalkeeper === true || !!entradaConvocatoria
+    }
 
     // Calcula o top 3 de MVPs de cada partida do mês, ordenados por votos
     const mvpsPorPartida = partidasComMvpDoMes.map((partida) => {
@@ -317,7 +347,17 @@ export async function GET(request: NextRequest) {
           }
         : null,
       mvpsPorPartida,
-      proximaPartida,
+      // Enriquece a próxima partida com dados de elegibilidade do usuário logado
+      proximaPartida: proximaPartida
+        ? {
+            id: proximaPartida.id,
+            match_date: proximaPartida.match_date,
+            location: proximaPartida.location,
+            status: proximaPartida.status,
+            usuarioPodeConfirmar,
+            usuarioJaConfirmou,
+          }
+        : null,
       aniversariantesDoMes: aniversariantesDoMesAtual,
       caixa: saldoFinanceiro,
     });

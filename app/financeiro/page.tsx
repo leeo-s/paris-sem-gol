@@ -1445,14 +1445,16 @@ export default function FinanceiroPage() {
 
           {/* ── aba: mensalidades ────────────────────────────────────────────── */}
           <TabsContent value="fees">
-            <Button
-              className="gap-1.5 sm:w-45 w-full mb-3"
-              size="sm"
-              onClick={() => setDialogoMensalistasAberto(true)}
-            >
-              <Users className="size-3.5" />
-              <span className="inline">Gerenciar Mensalistas</span>
-            </Button>
+            {ehAdmin && (
+              <Button
+                className="gap-1.5 sm:w-45 w-full mb-3"
+                size="sm"
+                onClick={() => setDialogoMensalistasAberto(true)}
+              >
+                <Users className="size-3.5" />
+                <span className="inline">Gerenciar Mensalistas</span>
+              </Button>
+            )}
             <Card>
               <CardContent className="p-0">
                 {carregando ? (
