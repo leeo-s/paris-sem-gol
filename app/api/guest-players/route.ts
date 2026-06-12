@@ -21,6 +21,9 @@ export async function GET(_request: NextRequest) {
                 id: true,
                 name: true,
                 phone: true,
+                position: true,
+                is_goalkeeper: true,
+                overall: true,
                 linked_user_id: true,
                 created_at: true,
             },
@@ -50,18 +53,28 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, phone, linked_user_id } = body
+        const { name, phone, position, is_goalkeeper, overall, linked_user_id } = body
 
         if (!name) {
             return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 })
         }
 
         const novoAvulso = await prisma.guest_players.create({
-            data: { name, phone, linked_user_id },
+            data: {
+                name,
+                phone: phone ?? null,
+                position: position ?? null,
+                is_goalkeeper: is_goalkeeper ?? false,
+                overall: overall ?? 5,
+                linked_user_id: linked_user_id ?? null,
+            },
             select: {
                 id: true,
                 name: true,
                 phone: true,
+                position: true,
+                is_goalkeeper: true,
+                overall: true,
                 linked_user_id: true,
                 created_at: true,
             },

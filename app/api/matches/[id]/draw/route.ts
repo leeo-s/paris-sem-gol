@@ -5,6 +5,9 @@ import type { NextRequest } from 'next/server'
 import { buscarPerfilUsuario, ehAdminOuCoAdmin } from '../../../_lib/auth'
 import { tratarErroPrisma } from '../../../_lib/prisma-errors'
 
+// Letras usadas para nomear os times automaticamente (Time A, Time B, ...)
+const LETRAS_TIME = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+
 interface JogadorParaSorteio {
     matchPlayerId: string
     userId: string | null
@@ -12,41 +15,70 @@ interface JogadorParaSorteio {
     nome: string
     apelido: string | null
     fotoUrl: string | null
+    posicao: string | null
     overall: number
     ehGoleiro: boolean
 }
 
-// Distribui jogadores em times equilibrados usando snake draft por overall
+// Embaralha array in-place usando Fisher-Yates para randomizar a ordem dos times
+function embaralharArray<T>(array: T[]): void {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]]
+    }
+}
+
+// Distribui jogadores de campo em times equilibrados usando snake draft puro.
+// Times completos recebem exatamente jogadoresPorTime jogadores; sobras formam um time menor ao final.
+// Exemplo: 22 jogadores, 5 por time → 4 times com 5 + 1 time com 2.
 function distribuirJogadoresEmTimes(
     jogadores: JogadorParaSorteio[],
-    quantidadeDeTimes: number
+    jogadoresPorTime: number
 ): JogadorParaSorteio[][] {
-    // Separa goleiros dos demais para distribuição especial
     const goleiros = jogadores.filter(j => j.ehGoleiro)
-    const jogadoresDeLinha = jogadores.filter(j => !j.ehGoleiro)
 
-    // Ordena por overall decrescente para o snake draft
-    const linhaOrdenada = [...jogadoresDeLinha].sort((a, b) => b.overall - a.overall)
+    // Ordena jogadores de linha por overall decrescente para o snake draft
+    const linhaOrdenada = [...jogadores.filter(j => !j.ehGoleiro)]
+        .sort((a, b) => b.overall - a.overall)
 
-    const times: JogadorParaSorteio[][] = Array.from({ length: quantidadeDeTimes }, () => [])
+    const totalDeLinha = linhaOrdenada.length
+    if (totalDeLinha === 0) return []
 
-    // Snake draft: T1, T2, T3, T4, T4, T3, T2, T1, T1, T2...
-    linhaOrdenada.forEach((jogador, indice) => {
-        const ciclo = Math.floor(indice / quantidadeDeTimes)
-        const posicaoNoCiclo = indice % quantidadeDeTimes
-        const indiceDoTime = ciclo % 2 === 0 ? posicaoNoCiclo : quantidadeDeTimes - 1 - posicaoNoCiclo
-        times[indiceDoTime].push(jogador)
-    })
+    // Usa floor para contar apenas times completos; sobras vão para um time menor separado
+    const quantidadeDeTimesCompletos = Math.floor(totalDeLinha / jogadoresPorTime)
+    const quantidadeRestante = totalDeLinha % jogadoresPorTime
 
-    // Distribui os goleiros sequencialmente um por time
+    const timesCompletos: JogadorParaSorteio[][] = Array.from({ length: quantidadeDeTimesCompletos }, () => [])
+
+    // Snake draft puro: cada rodada todos os times completos recebem um jogador, alternando direção
+    for (let rodada = 0; rodada < jogadoresPorTime; rodada++) {
+        const direcaoAFrente = rodada % 2 === 0
+        for (let passo = 0; passo < quantidadeDeTimesCompletos; passo++) {
+            const indiceTime = direcaoAFrente ? passo : quantidadeDeTimesCompletos - 1 - passo
+            const indiceJogador = rodada * quantidadeDeTimesCompletos + passo
+            timesCompletos[indiceTime].push(linhaOrdenada[indiceJogador])
+        }
+    }
+
+    // Embaralha os times completos para que o leve viés do snake draft em rodadas ímpares
+    // não recaia sempre nos mesmos times (ex: C e D sempre mais fortes)
+    embaralharArray(timesCompletos)
+
+    // Junta os times completos com o time menor (sobras), que sempre fica ao final
+    const times = [...timesCompletos]
+    if (quantidadeRestante > 0) {
+        times.push(linhaOrdenada.slice(quantidadeDeTimesCompletos * jogadoresPorTime))
+    }
+
+    // Goleiros distribuídos sequencialmente: 1º ao Time A, 2º ao Time B, etc.
     goleiros.forEach((goleiro, indice) => {
-        times[indice % quantidadeDeTimes].push(goleiro)
+        times[indice % times.length].push(goleiro)
     })
 
     return times
 }
 
-// POST /api/matches/:id/draw — executa o sorteio de times equilibrado por rating e salva no banco
+// POST /api/matches/:id/draw — sorteia times equilibrados por overall e salva no banco
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -67,17 +99,18 @@ export async function POST(
         const { id: matchId } = await params
         const body = await request.json()
 
-        // Quantidade de times padrão é 4 (A, B, C, D); configurável pelo admin
-        const quantidadeDeTimes: number = body.team_count ?? 4
-        const nomesDosTime: string[] = body.team_names ?? ['Time A', 'Time B', 'Time C', 'Time D'].slice(0, quantidadeDeTimes)
+        const jogadoresPorTime: number = body.players_per_team
 
-        if (quantidadeDeTimes < 2 || quantidadeDeTimes > 4) {
-            return NextResponse.json({ error: 'Quantidade de times deve ser entre 2 e 4' }, { status: 400 })
+        if (!jogadoresPorTime || jogadoresPorTime < 4 || jogadoresPorTime > 12) {
+            return NextResponse.json(
+                { error: 'Jogadores por time deve ser entre 4 e 12' },
+                { status: 400 }
+            )
         }
 
-        // Busca jogadores presentes com seus ratings
-        const jogadoresPresentes = await prisma.match_players.findMany({
-            where: { match_id: matchId },
+        // Busca apenas jogadores confirmados para o sorteio
+        const jogadoresConfirmados = await prisma.match_players.findMany({
+            where: { match_id: matchId, confirmed: true },
             include: {
                 users: {
                     select: {
@@ -85,33 +118,51 @@ export async function POST(
                         name: true,
                         nickname: true,
                         photo_url: true,
+                        position: true,
                         is_goalkeeper: true,
                         player_ratings: { select: { overall: true } },
                     },
                 },
-                guest_players: { select: { id: true, name: true } },
+                guest_players: { select: { id: true, name: true, position: true } },
             },
         })
 
-        if (jogadoresPresentes.length === 0) {
-            return NextResponse.json({ error: 'Nenhum jogador na lista de presentes' }, { status: 422 })
+        if (jogadoresConfirmados.length === 0) {
+            return NextResponse.json({ error: 'Nenhum jogador confirmado para o sorteio' }, { status: 422 })
         }
 
-        // Mapeia para estrutura uniforme de sorteio
-        const jogadoresParaSorteio: JogadorParaSorteio[] = jogadoresPresentes.map(mp => ({
+        // Valida se há jogadores de linha suficientes para pelo menos 2 times completos
+        const totalJogadoresDeLinha = jogadoresConfirmados.filter(
+            mp => !(mp.is_goalkeeper || (mp.users?.is_goalkeeper ?? false))
+        ).length
+
+        if (totalJogadoresDeLinha < jogadoresPorTime + 1) {
+            return NextResponse.json({
+                error: `São necessários ao menos ${jogadoresPorTime + 1} jogadores de campo para formar 2 times com esta configuração.`,
+            }, { status: 422 })
+        }
+
+        // Mapeia cada presença confirmada para a estrutura uniforme do sorteio
+        const jogadoresParaSorteio: JogadorParaSorteio[] = jogadoresConfirmados.map(mp => ({
             matchPlayerId: mp.id,
             userId: mp.user_id,
             guestPlayerId: mp.guest_player_id,
             nome: mp.users?.name ?? mp.guest_players?.name ?? 'Desconhecido',
             apelido: mp.users?.nickname ?? null,
             fotoUrl: mp.users?.photo_url ?? null,
+            posicao: mp.users?.position ?? mp.guest_players?.position ?? null,
             overall: mp.users?.player_ratings?.overall ?? 5,
-            ehGoleiro: mp.is_goalkeeper || mp.users?.is_goalkeeper || false,
+            ehGoleiro: mp.is_goalkeeper || (mp.users?.is_goalkeeper ?? false),
         }))
 
-        const timesDistribuidos = distribuirJogadoresEmTimes(jogadoresParaSorteio, quantidadeDeTimes)
+        const timesDistribuidos = distribuirJogadoresEmTimes(jogadoresParaSorteio, jogadoresPorTime)
+        const quantidadeDeTimes = timesDistribuidos.length
 
-        // Remove times anteriores do sorteio e recria (permite ressortear)
+        // Gera nomes dos times automaticamente se não fornecidos (Time A, B, C...)
+        const nomesDosTime: string[] = body.team_names ??
+            Array.from({ length: quantidadeDeTimes }, (_, i) => `Time ${LETRAS_TIME[i] ?? String(i + 1)}`)
+
+        // Remove times anteriores e recria (permite ressortear sem duplicar)
         await prisma.$transaction(async (tx) => {
             await tx.match_teams.deleteMany({ where: { match_id: matchId } })
 
@@ -126,10 +177,11 @@ export async function POST(
             }
         })
 
-        // Calcula o overall médio de cada time para exibição de equilíbrio
+        // Calcula o overall médio apenas dos jogadores de linha (goleiros excluídos)
         const timesComEstatisticas = timesDistribuidos.map((jogadores, indice) => {
-            const overallTotal = jogadores.reduce((soma, j) => soma + j.overall, 0)
-            const overallMedio = jogadores.length > 0 ? overallTotal / jogadores.length : 0
+            const jogadoresDeLinha = jogadores.filter(j => !j.ehGoleiro)
+            const somaOverall = jogadoresDeLinha.reduce((soma, j) => soma + j.overall, 0)
+            const overallMedio = jogadoresDeLinha.length > 0 ? somaOverall / jogadoresDeLinha.length : 0
 
             return {
                 nome: nomesDosTime[indice],
