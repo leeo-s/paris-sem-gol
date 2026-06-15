@@ -94,7 +94,7 @@ export async function PATCH(
 
         const { id } = await params
         const body = await request.json()
-        const { status, location, match_date } = body
+        const { status, location, match_date, team_assignments } = body
 
         const statusValidos = ['scheduled', 'started', 'completed', 'cancelled']
         if (status && !statusValidos.includes(status)) {
@@ -106,12 +106,22 @@ export async function PATCH(
         if (location !== undefined) dadosParaAtualizar.location = location
         if (match_date !== undefined) dadosParaAtualizar.match_date = new Date(match_date)
 
-        // Usa transação para garantir que a sessão MVP seja criada junto com a conclusão
+        // Usa transação para garantir atomicidade entre status, times e sessão MVP
         const partidaAtualizada = await prisma.$transaction(async (tx) => {
             const partida = await tx.matches.update({
                 where: { id },
                 data: dadosParaAtualizar,
             })
+
+            // Ao iniciar a partida, salva a vinculação definitiva de cada jogador ao seu time
+            if (status === 'started' && Array.isArray(team_assignments) && team_assignments.length > 0) {
+                for (const atribuicao of team_assignments as { matchPlayerId: string; teamId: string }[]) {
+                    await tx.match_players.update({
+                        where: { id: atribuicao.matchPlayerId },
+                        data: { team_id: atribuicao.teamId },
+                    })
+                }
+            }
 
             // Ao concluir a partida, abre automaticamente a sessão de votação MVP por 24h
             if (status === 'completed') {

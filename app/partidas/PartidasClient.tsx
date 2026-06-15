@@ -347,7 +347,7 @@ function CartaoAberta({
             >
               {ehHoje && ehAdmin && (
                 <Link
-                  href={`/partidas/${partida.id}/iniciar`}
+                  href={`/partidas/${partida.id}/sortear`}
                   className={buttonVariants({ size: "sm" })}
                 >
                   <Shuffle className="size-3.5" />

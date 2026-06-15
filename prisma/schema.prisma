@@ -155,9 +155,11 @@ model match_players {
   guest_player_id String?        @db.Uuid
   is_goalkeeper   Boolean        @default(false)
   confirmed       Boolean        @default(false)
+  team_id         String?        @db.Uuid
   guest_players   guest_players? @relation(fields: [guest_player_id], references: [id], onUpdate: NoAction)
   matches         matches        @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   users           users?         @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  match_teams     match_teams?   @relation(fields: [team_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@unique([match_id, user_id])
   @@index([match_id], map: "idx_match_players_match")
@@ -193,6 +195,7 @@ model match_teams {
   match_rounds_match_rounds_home_team_idTomatch_teams   match_rounds[] @relation("match_rounds_home_team_idTomatch_teams")
   match_rounds_match_rounds_winner_team_idTomatch_teams match_rounds[] @relation("match_rounds_winner_team_idTomatch_teams")
   matches                                               matches        @relation(fields: [match_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  match_players                                         match_players[]
 
   @@unique([match_id, team_index])
 }

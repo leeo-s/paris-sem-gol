@@ -41,6 +41,25 @@ import { cn } from "@/lib/utils";
 
 type MatchStatus = "scheduled" | "started" | "completed" | "cancelled";
 
+type JogadorTime = {
+  matchPlayerId: string;
+  userId: string | null;
+  guestPlayerId: string | null;
+  nome: string;
+  apelido: string | null;
+  fotoUrl: string | null;
+  posicao: string | null;
+  overall: number;
+  ehGoleiro: boolean;
+};
+
+type ResultadoTime = {
+  nome: string;
+  indice: number;
+  overallMedio: number;
+  jogadores: JogadorTime[];
+};
+
 // Representa um candidato que pode ser adicionado à partida (membro ou avulso)
 type Candidato = {
   tipo: "user" | "guest";
@@ -281,6 +300,17 @@ function computarEstatisticas(partida: Partida): EstatisticaJogador[] {
 
 // ─── constantes ──────────────────────────────────────────────────────────────
 
+const CORES_TIME = [
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-purple-500",
+  "bg-cyan-500",
+  "bg-orange-500",
+  "bg-pink-500",
+];
+
 const POSICOES_AVULSO: {
   valor: PosicaoAvulso;
   sigla: string;
@@ -377,6 +407,171 @@ function AvatarJogador({
         {initials}
       </AvatarFallback>
     </Avatar>
+  );
+}
+
+// ─── sub-componentes: times sorteados ────────────────────────────────────────
+
+function CardJogadorTime({ jogador }: { jogador: JogadorTime }) {
+  const nome = jogador.apelido ?? jogador.nome;
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5">
+      <Avatar size="sm">
+        {jogador.fotoUrl && <AvatarImage src={jogador.fotoUrl} alt={nome} />}
+        <AvatarFallback className="bg-primary/10 text-primary font-heading text-xs">
+          {getInitials(nome)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{nome}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {jogador.posicao ?? (jogador.ehGoleiro ? "Goleiro" : "Campo")}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {jogador.ehGoleiro && <Shield className="size-3.5 text-info" />}
+        <span className="text-xs font-semibold bg-muted px-2 py-0.5 rounded-full text-foreground">
+          {jogador.overall}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CardTimeDetalhes({
+  time,
+  indiceVisual,
+}: {
+  time: ResultadoTime;
+  indiceVisual: number;
+}) {
+  const corDestaque = CORES_TIME[indiceVisual] ?? "bg-muted-foreground";
+  return (
+    <div className="bg-card rounded-xl ring-1 ring-foreground/10 overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
+        <div className={cn("size-2.5 rounded-full shrink-0", corDestaque)} />
+        <h3 className="font-heading text-base text-foreground flex-1">
+          {time.nome}
+        </h3>
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-muted-foreground">OVR</span>
+          <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-full">
+            {time.overallMedio.toFixed(1)}
+          </span>
+        </div>
+      </div>
+      <div className="divide-y divide-border">
+        {time.jogadores.map((j) => (
+          <CardJogadorTime key={j.matchPlayerId} jogador={j} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── vista: partida iniciada ──────────────────────────────────────────────────
+
+function ViewIniciada({
+  partida,
+  ehAdmin,
+  times,
+  carregandoTimes,
+  onIrParaPlacar,
+}: {
+  partida: Partida;
+  ehAdmin: boolean;
+  times: ResultadoTime[] | null;
+  carregandoTimes: boolean;
+  onIrParaPlacar: () => void;
+}) {
+  const horario = extrairHorario(partida.time);
+
+  return (
+    <div className="space-y-4">
+      {/* Cabeçalho */}
+      <div className="bg-card rounded-xl ring-1 ring-foreground/10 p-4 md:p-6 space-y-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-heading text-2xl md:text-3xl tracking-wide text-foreground">
+              Fut Semanal
+            </p>
+            <BadgeStatus status={partida.status} />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="size-3.5 shrink-0" />
+              {formatDateShort(partida.match_date)}
+            </span>
+            {horario && (
+              <span className="flex items-center gap-1.5">
+                <Clock className="size-3.5 shrink-0" />
+                {horario}
+              </span>
+            )}
+            {partida.location && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="size-3.5 shrink-0" />
+                {partida.location}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {ehAdmin && (
+          <div className="flex items-center gap-2 pt-1 border-t border-border">
+            <Button className="mt-3 sm:mt-5" size="sm" onClick={onIrParaPlacar}>
+              <Play className="size-3.5" />
+              Ir para Placar
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Times sorteados */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 rounded-full bg-primary" />
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            {carregandoTimes
+              ? "Carregando times..."
+              : times && times.length > 0
+                ? `Times sorteados (${times.length})`
+                : "Times sorteados"}
+          </h2>
+        </div>
+
+        {carregandoTimes ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+          </div>
+        ) : !times || times.length === 0 ? (
+          <div className="bg-card rounded-xl ring-1 ring-foreground/10 p-8 text-center">
+            <Users className="size-8 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Nenhum time foi sorteado para esta partida.
+            </p>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "grid gap-4",
+              times.length >= 2
+                ? "grid-cols-1 md:grid-cols-2"
+                : "grid-cols-1",
+            )}
+          >
+            {times.map((time, indice) => (
+              <CardTimeDetalhes
+                key={time.indice}
+                time={time}
+                indiceVisual={indice}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -880,6 +1075,26 @@ export function PartidaDetalhesClient({
   const [salvandoAvulso, setSalvandoAvulso] = useState(false);
   const [erroAvulso, setErroAvulso] = useState<string | null>(null);
 
+  const [timesGuardados, setTimesGuardados] = useState<ResultadoTime[] | null>(
+    null,
+  );
+  const [carregandoTimes, setCarregandoTimes] = useState(false);
+
+  const buscarTimes = useCallback(async () => {
+    setCarregandoTimes(true);
+    try {
+      const res = await fetch(`/api/matches/${matchId}/draw`);
+      if (res.ok) {
+        const dados = await res.json();
+        setTimesGuardados(dados.times);
+      }
+    } catch {
+      // exibe estado vazio em caso de falha
+    } finally {
+      setCarregandoTimes(false);
+    }
+  }, [matchId]);
+
   const buscarPartida = useCallback(async () => {
     setCarregando(true);
     setErroGeral(null);
@@ -905,6 +1120,12 @@ export function PartidaDetalhesClient({
   useEffect(() => {
     buscarPartida();
   }, [buscarPartida]);
+
+  useEffect(() => {
+    if (partida?.status === "started") {
+      buscarTimes();
+    }
+  }, [partida?.status, buscarTimes]);
 
   function abrirModalEdicao() {
     if (!partida) return;
@@ -1210,11 +1431,21 @@ export function PartidaDetalhesClient({
         <>
           {partida.status === "completed" ? (
             <ViewEncerrada partida={partida} />
+          ) : partida.status === "started" ? (
+            <ViewIniciada
+              partida={partida}
+              ehAdmin={ehAdmin}
+              times={timesGuardados}
+              carregandoTimes={carregandoTimes}
+              onIrParaPlacar={() =>
+                router.push(`/partidas/${partida.id}/placar`)
+              }
+            />
           ) : (
             <ViewAgendada
               partida={partida}
               ehAdmin={ehAdmin}
-              jaIniciada={partida.status === "started"}
+              jaIniciada={false}
               onRequestEditar={abrirModalEdicao}
               onRequestExcluir={() => {
                 setErroExclusao(null);
@@ -1226,9 +1457,7 @@ export function PartidaDetalhesClient({
               }}
               onRequestAdicionarJogadores={abrirModalAdicionarJogadores}
               onRequestIniciar={() =>
-                partida.status === "started"
-                  ? router.push(`/partidas/${partida.id}/placar`)
-                  : router.push(`/partidas/${partida.id}/sortear`)
+                router.push(`/partidas/${partida.id}/sortear`)
               }
             />
           )}

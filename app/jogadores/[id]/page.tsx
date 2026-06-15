@@ -17,6 +17,11 @@ import {
   ShieldOff,
   Trophy,
   Calendar,
+  MapPin,
+  Target,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -85,6 +90,23 @@ type SessaoUsuario = {
 
 type AbaAtiva = "mensalidades" | "partidas" | "destaques";
 
+type PartidaHistorico = {
+  id: string;
+  match_date: string;
+  location: string | null;
+  status: "scheduled" | "completed" | "cancelled" | "started";
+  gols: number;
+  votosRecebidos: number;
+  mvp: {
+    id: string;
+    name: string;
+    nickname: string | null;
+    photo_url: string | null;
+    votos: number;
+  } | null;
+  ehMvp: boolean;
+};
+
 // ─── constantes ───────────────────────────────────────────────────────────────
 
 const MESES = [
@@ -125,7 +147,11 @@ function formatarTelefone(phone: string | null): string {
 // Formata a data de membro exibindo mês e ano, forçando UTC para evitar deslocamento de fuso
 function formatarDataMembro(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric", timeZone: "UTC" });
+  return d.toLocaleDateString("pt-BR", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 // Formata a data de pagamento em dd/mm/aaaa, forçando UTC para evitar deslocamento de fuso
@@ -220,6 +246,236 @@ function SkeletonPerfil() {
   );
 }
 
+// Abrevia o nome do mês a partir do número (1–12)
+function abreviarMes(numeroMes: number): string {
+  return new Date(2000, numeroMes - 1)
+    .toLocaleDateString("pt-BR", { month: "short" })
+    .replace(".", "")
+    .toUpperCase();
+}
+
+// Badge colorido para o status da partida
+function BadgeStatusPartida({
+  status,
+}: {
+  status: PartidaHistorico["status"];
+}) {
+  const mapa = {
+    scheduled: {
+      label: "Agendada",
+      className: "bg-muted text-muted-foreground",
+    },
+    started: {
+      label: "Em andamento",
+      className: "bg-warning/15 text-warning-foreground",
+    },
+    completed: {
+      label: "Encerrada",
+      className: "bg-muted text-muted-foreground",
+    },
+    cancelled: {
+      label: "Cancelada",
+      className: "bg-destructive/15 text-destructive",
+    },
+  };
+
+  const cfg = mapa[status] ?? mapa.scheduled;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+        cfg.className,
+      )}
+    >
+      {cfg.label}
+    </span>
+  );
+}
+
+const PARTIDAS_POR_PAGINA = 5;
+
+// Conteúdo da aba de histórico de partidas do jogador, com paginação
+function AbaPartidas({
+  historico,
+  carregando,
+  ehGoleiro,
+}: {
+  historico: PartidaHistorico[] | null;
+  carregando: boolean;
+  ehGoleiro: boolean;
+}) {
+  const [paginaAtual, setPaginaAtual] = useState(1);
+
+  // Estado de carregamento: exibe skeletons no lugar dos cards
+  if (carregando || historico === null) {
+    return (
+      <div className="divide-y divide-border">
+        {[...Array(PARTIDAS_POR_PAGINA)].map((_, i) => (
+          <div key={i} className="p-4 space-y-2">
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-14 rounded-xl shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+            </div>
+            <Skeleton className="h-8 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Estado vazio: nenhuma partida registrada
+  if (historico.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+        <Calendar className="size-8 opacity-30" />
+        <p className="text-sm">Nenhuma partida registrada.</p>
+      </div>
+    );
+  }
+
+  const totalPaginas = Math.ceil(historico.length / PARTIDAS_POR_PAGINA);
+  const indiceInicio = (paginaAtual - 1) * PARTIDAS_POR_PAGINA;
+  const partidasDaPagina = historico.slice(
+    indiceInicio,
+    indiceInicio + PARTIDAS_POR_PAGINA,
+  );
+
+  return (
+    <div>
+      <div className="divide-y divide-border">
+        {partidasDaPagina.map((partida) => {
+          const dataPartida = new Date(partida.match_date);
+          const dia = dataPartida.getUTCDate().toString().padStart(2, "0");
+          const mes = abreviarMes(dataPartida.getUTCMonth() + 1);
+
+          // Rótulo e ícone dos gols variam conforme a posição do jogador
+          const labelGols = ehGoleiro
+            ? `gol${partida.gols !== 1 ? "s" : ""} sofrido${partida.gols !== 1 ? "s" : ""}`
+            : `gol${partida.gols !== 1 ? "s" : ""}`;
+          const IconeGol = ehGoleiro ? Shield : Target;
+
+          return (
+            <div key={partida.id} className="p-4 space-y-2.5">
+              {/* Linha principal: data + status + local + estatísticas */}
+              <div className="flex items-start gap-3">
+                {/* Caixa com a data */}
+                <div className="flex flex-col items-center justify-center rounded-xl bg-muted px-3 py-2 shrink-0 min-w-[52px] text-center">
+                  <span className="font-heading text-2xl leading-none text-foreground">
+                    {dia}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">
+                    {mes}
+                  </span>
+                </div>
+
+                {/* Informações e estatísticas da partida */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <BadgeStatusPartida status={partida.status} />
+                    {partida.location && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="size-3" />
+                        {partida.location}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Estatísticas individuais: gols e votos MVP */}
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="flex items-center gap-1.5">
+                      <IconeGol className="size-3.5 text-muted-foreground" />
+                      <span className="font-heading text-lg leading-none text-foreground">
+                        {partida.gols}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {labelGols}
+                      </span>
+                    </span>
+
+                    <span className="flex items-center gap-1.5">
+                      <Star className="size-3.5 text-muted-foreground" />
+                      <span className="font-heading text-lg leading-none text-foreground">
+                        {partida.votosRecebidos}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {partida.votosRecebidos === 1 ? "voto MVP" : "votos MVP"}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Linha do MVP: destaque em ouro se o próprio jogador foi o MVP */}
+              {partida.mvp && (
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-2.5 py-1.5",
+                    partida.ehMvp ? "bg-gold/10" : "bg-muted/50",
+                  )}
+                >
+                  <Trophy
+                    className={cn(
+                      "size-3 shrink-0",
+                      partida.ehMvp ? "text-gold" : "text-muted-foreground",
+                    )}
+                    fill={partida.ehMvp ? "currentColor" : "none"}
+                  />
+                  <span
+                    className={cn(
+                      "text-xs truncate",
+                      partida.ehMvp
+                        ? "font-semibold text-gold"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    MVP: {partida.mvp.nickname ?? partida.mvp.name}
+                    {partida.ehMvp && " · você!"}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                    {partida.mvp.votos}{" "}
+                    {partida.mvp.votos === 1 ? "voto" : "votos"}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Controles de paginação */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+          <button
+            onClick={() => setPaginaAtual((p) => Math.max(1, p - 1))}
+            disabled={paginaAtual === 1}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Anterior
+          </button>
+
+          <span className="text-xs text-muted-foreground">
+            {indiceInicio + 1}–
+            {Math.min(indiceInicio + PARTIDAS_POR_PAGINA, historico.length)} de{" "}
+            {historico.length} partidas
+          </span>
+
+          <button
+            onClick={() => setPaginaAtual((p) => Math.min(totalPaginas, p + 1))}
+            disabled={paginaAtual === totalPaginas}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── página principal ─────────────────────────────────────────────────────────
 
 export default function PerfilJogadorPage() {
@@ -237,6 +493,11 @@ export default function PerfilJogadorPage() {
   const [totalPartidas, setTotalPartidas] = useState(0);
   const [totalPresença, setTotalPresença] = useState(0);
   const [totalVotos, setTotalVotos] = useState(0);
+  const [partidasHistorico, setPartidasHistorico] = useState<
+    PartidaHistorico[] | null
+  >(null);
+  const [carregandoPartidas, setCarregandoPartidas] = useState(false);
+  const [anoMensalidade, setAnoMensalidade] = useState(new Date().getFullYear());
 
   const carregarDados = useCallback(async () => {
     setCarregando(true);
@@ -298,6 +559,28 @@ export default function PerfilJogadorPage() {
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
+
+  // Busca o histórico de partidas somente quando a aba for selecionada pela primeira vez
+  const carregarHistoricoPartidas = useCallback(async () => {
+    setCarregandoPartidas(true);
+    try {
+      const resposta = await fetch(`/api/users/${id}/match-history`);
+      if (resposta.ok) {
+        const dados = await resposta.json();
+        setPartidasHistorico(Array.isArray(dados) ? dados : []);
+      }
+    } catch {
+      setPartidasHistorico([]);
+    } finally {
+      setCarregandoPartidas(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (aba === "partidas" && partidasHistorico === null) {
+      carregarHistoricoPartidas();
+    }
+  }, [aba, partidasHistorico, carregarHistoricoPartidas]);
 
   async function suspender() {
     if (!jogador) return;
@@ -662,87 +945,139 @@ export default function PerfilJogadorPage() {
         </div>
 
         {/* Aba: Mensalidades */}
-        {aba === "mensalidades" && (
-          <>
-            {/* Desktop: tabela completa */}
-            <div className="hidden md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Competência</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Data Pgto.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mensalidades.length === 0 ? (
+        {aba === "mensalidades" && (() => {
+          // Anos disponíveis extraídos das mensalidades, mais o ano atual sempre presente
+          const anosDisponiveis = Array.from(
+            new Set([
+              new Date().getFullYear(),
+              ...mensalidades.map((m) => m.year),
+            ]),
+          ).sort((a, b) => b - a);
+
+          // Mensalidades filtradas pelo ano selecionado
+          const mensalidadesFiltradas = mensalidades.filter(
+            (m) => m.year === anoMensalidade,
+          );
+
+          const semDados = mensalidadesFiltradas.length === 0;
+
+          return (
+            <>
+              {/* Seletor de ano por setas */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+                <button
+                  onClick={() =>
+                    setAnoMensalidade((a) =>
+                      anosDisponiveis[anosDisponiveis.indexOf(a) + 1] ?? a,
+                    )
+                  }
+                  disabled={
+                    anosDisponiveis.indexOf(anoMensalidade) ===
+                    anosDisponiveis.length - 1
+                  }
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+
+                <span className="text-sm font-medium text-foreground">
+                  {anoMensalidade}
+                </span>
+
+                <button
+                  onClick={() =>
+                    setAnoMensalidade((a) =>
+                      anosDisponiveis[anosDisponiveis.indexOf(a) - 1] ?? a,
+                    )
+                  }
+                  disabled={anosDisponiveis.indexOf(anoMensalidade) === 0}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+
+              {/* Desktop: tabela completa */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="h-28 text-center text-muted-foreground"
-                      >
-                        {jogador.is_goalkeeper
-                          ? "Goleiro isento de mensalidade."
-                          : "Nenhuma mensalidade registrada."}
-                      </TableCell>
+                      <TableHead>Competência</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Data Pgto.</TableHead>
                     </TableRow>
-                  ) : (
-                    mensalidades.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="font-medium">
-                          {MESES[m.month - 1]} {m.year}
-                        </TableCell>
-                        <TableCell>
-                          <BadgeMensalidade status={m.status} />
-                        </TableCell>
-                        <TableCell>{formatarValor(m.amount)}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatarDataPagamento(m.paid_at)}
+                  </TableHeader>
+                  <TableBody>
+                    {semDados ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="h-28 text-center text-muted-foreground"
+                        >
+                          {jogador.is_goalkeeper
+                            ? "Goleiro isento de mensalidade."
+                            : `Nenhuma mensalidade registrada em ${anoMensalidade}.`}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ) : (
+                      mensalidadesFiltradas.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell className="font-medium">
+                            {MESES[m.month - 1]}
+                          </TableCell>
+                          <TableCell>
+                            <BadgeMensalidade status={m.status} />
+                          </TableCell>
+                          <TableCell>{formatarValor(m.amount)}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatarDataPagamento(m.paid_at)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
-            {/* Mobile: lista compacta */}
-            <div className="md:hidden divide-y divide-border">
-              {mensalidades.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  {jogador.is_goalkeeper
-                    ? "Goleiro isento de mensalidade."
-                    : "Nenhuma mensalidade registrada."}
-                </div>
-              ) : (
-                mensalidades.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between px-4 py-3"
-                  >
-                    <span className="text-sm font-medium text-foreground">
-                      {MESES[m.month - 1]} {m.year}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <BadgeMensalidade status={m.status} />
-                      <span className="text-xs text-muted-foreground">
-                        · {formatarValor(m.amount)}
-                      </span>
-                    </div>
+              {/* Mobile: lista compacta */}
+              <div className="md:hidden divide-y divide-border">
+                {semDados ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    {jogador.is_goalkeeper
+                      ? "Goleiro isento de mensalidade."
+                      : `Nenhuma mensalidade registrada em ${anoMensalidade}.`}
                   </div>
-                ))
-              )}
-            </div>
-          </>
-        )}
+                ) : (
+                  mensalidadesFiltradas.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between px-4 py-3"
+                    >
+                      <span className="text-sm font-medium text-foreground">
+                        {MESES[m.month - 1]}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <BadgeMensalidade status={m.status} />
+                        <span className="text-xs text-muted-foreground">
+                          · {formatarValor(m.amount)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          );
+        })()}
 
         {/* Aba: Partidas */}
         {aba === "partidas" && (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-            <Calendar className="size-8 opacity-30" />
-            <p className="text-sm">Histórico de partidas em breve.</p>
-          </div>
+          <AbaPartidas
+            historico={partidasHistorico}
+            carregando={carregandoPartidas}
+            ehGoleiro={jogador.is_goalkeeper}
+          />
         )}
 
         {/* Aba: Destaques */}

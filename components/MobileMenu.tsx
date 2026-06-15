@@ -32,8 +32,8 @@ const navItems = [
   { title: "Partidas", href: "/partidas", icon: Swords },
   { title: "Jogadores", href: "/jogadores", icon: Users },
   { title: "Financeiro", href: "/financeiro", icon: CircleDollarSign },
-  { title: "Classificação", href: "/rank", icon: BarChart2 },
-  { title: "Torneios", href: "/campeonatos", icon: Trophy },
+  // { title: "Classificação", href: "/rank", icon: BarChart2 },
+  // { title: "Torneios", href: "/campeonatos", icon: Trophy },
 ];
 
 // Itens do rodapé que não precisam de lógica especial

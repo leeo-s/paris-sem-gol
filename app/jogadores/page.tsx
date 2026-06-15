@@ -330,7 +330,8 @@ export default function ElencoPage() {
     }
   }
 
-  const nomeExibido = (j: Jogador) => j.nickname ?? j.name;
+  const nomeExibido = (j: Jogador) => j.name;
+  const nicknameExibido = (j: Jogador) => (j.nickname ? j.nickname : "");
   const subtitulo = (j: Jogador) =>
     j.is_goalkeeper ? "Goleiro titular" : (j.phone ?? "");
 
@@ -456,10 +457,15 @@ export default function ElencoPage() {
                         src={j.photo_url ?? undefined}
                         size="md"
                       />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex flex-col">
                         <p className="font-medium text-foreground leading-none truncate">
                           {nomeExibido(j)}
                         </p>
+                        {nicknameExibido(j) !== "" && (
+                          <p className="text-xs font-light text-gray-500 truncate mt-0.5">
+                            {nicknameExibido(j)}
+                          </p>
+                        )}
                         {/* {subtitulo(j) && (
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">
                             {subtitulo(j)}

@@ -35,6 +35,7 @@ type ResultadoTime = {
   indice: number;
   overallMedio: number;
   jogadores: JogadorSorteado[];
+  teamId: string;
 };
 
 // ─── constantes ──────────────────────────────────────────────────────────────
@@ -201,15 +202,25 @@ export function SortearClient({ matchId }: { matchId: string }) {
   const [iniciando, setIniciando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Marca a partida como iniciada e redireciona para a tela de placar
+  // Marca a partida como iniciada, salva os times e redireciona para a tela de placar
   async function iniciarPartida() {
     setIniciando(true);
     setErro(null);
     try {
+      const teamAssignments = timesResultado?.flatMap((time) =>
+        time.jogadores.map((j) => ({
+          matchPlayerId: j.matchPlayerId,
+          teamId: time.teamId,
+        })),
+      );
+
       const resposta = await fetch(`/api/matches/${matchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "started" }),
+        body: JSON.stringify({
+          status: "started",
+          ...(teamAssignments && { team_assignments: teamAssignments }),
+        }),
       });
       if (!resposta.ok) {
         const dados = await resposta.json();
