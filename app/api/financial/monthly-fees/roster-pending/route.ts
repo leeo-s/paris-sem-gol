@@ -53,10 +53,11 @@ export async function GET(request: NextRequest) {
             orderBy: { name: 'asc' },
         })
 
-        // Formata a resposta usando apelido quando disponível
+        // Renomeia monthly_fees para fees, mantendo nome completo e apelido separados
         const resposta = usuariosComFeesPendentes.map((usuario) => ({
             id: usuario.id,
-            name: usuario.nickname ?? usuario.name,
+            name: usuario.name,
+            nickname: usuario.nickname,
             fees: usuario.monthly_fees,
         }))
 

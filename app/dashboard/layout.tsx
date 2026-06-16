@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/get-session-user";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -10,6 +11,8 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await getSessionUser();
+  if (!user) redirect("/login");
+  if (!user.first_login_at) redirect("/criar-senha");
 
   return (
     <SidebarProvider

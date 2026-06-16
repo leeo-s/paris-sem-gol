@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ComponentType } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -22,6 +22,11 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Wallet,
+  Flame,
+  Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,13 +87,39 @@ type Mensalidade = {
   notes: string | null;
 };
 
+type Transacao = {
+  id: string;
+  type: "income" | "expense";
+  category: string;
+  amount: string;
+  description: string;
+  reference_date: string;
+  payment_method: "Pix" | "Dinheiro" | "Cartao";
+};
+
 type SessaoUsuario = {
   id: string;
   name: string;
   role: string;
 } | null;
 
-type AbaAtiva = "mensalidades" | "partidas" | "destaques";
+type AbaAtiva = "mensalidades" | "partidas" | "destaques" | "pagamentos";
+
+// Estatísticas consolidadas do jogador exibidas na aba de Destaques
+type Destaques = {
+  ehGoleiro: boolean;
+  gols: { total: number; ano: number; mes: number };
+  mvp: {
+    votos: { total: number; ano: number; mes: number };
+    eleito: { total: number; ano: number; mes: number };
+  };
+  presenca: {
+    total: { partidas: number; totalPartidas: number; percentual: number };
+    ano: { partidas: number; totalPartidas: number; percentual: number };
+    mes: { partidas: number; totalPartidas: number; percentual: number };
+  };
+  sequenciaPresenca: number;
+};
 
 type PartidaHistorico = {
   id: string;
@@ -123,6 +154,15 @@ const MESES = [
   "Novembro",
   "Dezembro",
 ];
+
+// Rótulos amigáveis para o método de pagamento registrado na transação
+const METODOS_PAGAMENTO: Record<Transacao["payment_method"], string> = {
+  Pix: "Pix",
+  Dinheiro: "Dinheiro",
+  Cartao: "Cartão",
+};
+
+const TRANSACOES_POR_PAGINA = 10;
 
 const ATRIBUTOS: { label: string; key: keyof PlayerRatings }[] = [
   { label: "VEL", key: "speed" },
@@ -293,6 +333,310 @@ function BadgeStatusPartida({
   );
 }
 
+// Badge colorido indicando se a transação foi uma entrada ou saída financeira
+function BadgeTipoTransacao({ type }: { type: Transacao["type"] }) {
+  const entrada = type === "income";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        entrada
+          ? "bg-success/15 text-success"
+          : "bg-destructive/15 text-destructive",
+      )}
+    >
+      {entrada ? (
+        <ArrowDownLeft className="size-3" />
+      ) : (
+        <ArrowUpRight className="size-3" />
+      )}
+      {entrada ? "Entrada" : "Saída"}
+    </span>
+  );
+}
+
+// Conteúdo da aba de pagamentos do jogador: histórico de transações financeiras,
+// paginado em blocos de 10 a partir da API (paginação feita no servidor)
+function AbaPagamentos({
+  transacoes,
+  carregando,
+  paginaAtual,
+  totalPaginas,
+  totalRegistros,
+  aoMudarPagina,
+}: {
+  transacoes: Transacao[] | null;
+  carregando: boolean;
+  paginaAtual: number;
+  totalPaginas: number;
+  totalRegistros: number;
+  aoMudarPagina: (pagina: number) => void;
+}) {
+  // Estado de carregamento: exibe skeletons no lugar das linhas
+  if (carregando || transacoes === null) {
+    return (
+      <div className="divide-y divide-border p-4 space-y-3">
+        {[...Array(TRANSACOES_POR_PAGINA)].map((_, i) => (
+          <Skeleton key={i} className="h-10 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  // Estado vazio: nenhuma transação registrada
+  if (transacoes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+        <Wallet className="size-8 opacity-30" />
+        <p className="text-sm">Nenhuma transação registrada.</p>
+      </div>
+    );
+  }
+
+  const indiceInicio = (paginaAtual - 1) * TRANSACOES_POR_PAGINA;
+
+  return (
+    <div>
+      {/* Desktop: tabela completa */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Data Ref.</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead>Valor</TableHead>
+              <TableHead>Pagamento</TableHead>
+              <TableHead>Tipo</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {transacoes.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="text-muted-foreground">
+                  {formatarDataPagamento(t.reference_date)}
+                </TableCell>
+                <TableCell className="font-medium">{t.description}</TableCell>
+                <TableCell>{formatarValor(t.amount)}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {METODOS_PAGAMENTO[t.payment_method]}
+                </TableCell>
+                <TableCell>
+                  <BadgeTipoTransacao type={t.type} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile: lista compacta */}
+      <div className="md:hidden divide-y divide-border">
+        {transacoes.map((t) => (
+          <div key={t.id} className="px-4 py-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground truncate">
+                {t.description}
+              </span>
+              <span className="text-sm font-semibold tabular-nums shrink-0">
+                {formatarValor(t.amount)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {formatarDataPagamento(t.reference_date)} ·{" "}
+                {METODOS_PAGAMENTO[t.payment_method]}
+              </span>
+              <BadgeTipoTransacao type={t.type} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Controles de paginação */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+          <button
+            onClick={() => aoMudarPagina(Math.max(1, paginaAtual - 1))}
+            disabled={paginaAtual === 1}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Anterior
+          </button>
+
+          <span className="text-xs text-muted-foreground">
+            {indiceInicio + 1}–
+            {Math.min(indiceInicio + TRANSACOES_POR_PAGINA, totalRegistros)} de{" "}
+            {totalRegistros} transações
+          </span>
+
+          <button
+            onClick={() =>
+              aoMudarPagina(Math.min(totalPaginas, paginaAtual + 1))
+            }
+            disabled={paginaAtual === totalPaginas}
+            className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Próxima →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Formata um percentual no formato 0–1 como string "82%"
+function formatarPercentual(valor: number): string {
+  return `${Math.round(valor * 100)}%`;
+}
+
+// Card de estatística com três colunas comparando Total / Ano / Mês
+function CardEstatistica({
+  icone: Icone,
+  titulo,
+  corIcone,
+  colunas,
+  className,
+}: {
+  icone: ComponentType<{ className?: string }>;
+  titulo: string;
+  corIcone: string;
+  colunas: { label: string; valor: string }[];
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-xl border border-border bg-card p-4", className)}>
+      <div className="flex items-center gap-2 mb-3">
+        <Icone className={cn("size-4", corIcone)} />
+        <p className="text-sm font-semibold text-foreground">{titulo}</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {colunas.map((coluna) => (
+          <div key={coluna.label} className="text-center">
+            <p className="font-heading text-2xl leading-none text-foreground">
+              {coluna.valor}
+            </p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
+              {coluna.label}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Card de presença, com percentual em destaque e a fração de partidas abaixo
+function CardPresenca({ presenca }: { presenca: Destaques["presenca"] }) {
+  const colunas = [
+    { label: "Total", dado: presenca.total },
+    { label: "Ano", dado: presenca.ano },
+    { label: "Mês", dado: presenca.mes },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 md:col-span-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Percent className="size-4 text-success" />
+        <p className="text-sm font-semibold text-foreground">Presença</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {colunas.map((coluna) => (
+          <div key={coluna.label} className="text-center">
+            <p className="font-heading text-2xl leading-none text-success">
+              {formatarPercentual(coluna.dado.percentual)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {coluna.dado.partidas}/{coluna.dado.totalPartidas} partidas
+            </p>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-0.5">
+              {coluna.label}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Conteúdo da aba de Destaques: estatísticas consolidadas de gols, MVP e presença,
+// comparando sempre o total geral com o ano e o mês atuais
+function AbaDestaques({
+  destaques,
+  carregando,
+  ehGoleiro,
+}: {
+  destaques: Destaques | null;
+  carregando: boolean;
+  ehGoleiro: boolean;
+}) {
+  // Estado de carregamento: exibe skeletons no lugar dos cards
+  if (carregando || destaques === null) {
+    return (
+      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  // Rótulo e ícone dos gols variam conforme a posição do jogador
+  const labelGols = ehGoleiro ? "Gols Sofridos" : "Gols Marcados";
+  const IconeGols = ehGoleiro ? Shield : Target;
+
+  return (
+    <div className="p-4 space-y-3">
+      {/* Sequência atual de presença, destacada quando relevante (3+ partidas) */}
+      {destaques.sequenciaPresenca >= 3 && (
+        <div className="flex items-center gap-2 rounded-lg bg-gold/10 border border-gold/30 px-3 py-2">
+          <Flame className="size-4 text-gold shrink-0" />
+          <span className="text-sm text-gold font-medium">
+            {destaques.sequenciaPresenca} partidas consecutivas presente
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <CardEstatistica
+          icone={IconeGols}
+          titulo={labelGols}
+          corIcone="text-destructive"
+          colunas={[
+            { label: "Total", valor: String(destaques.gols.total) },
+            { label: "Ano", valor: String(destaques.gols.ano) },
+            { label: "Mês", valor: String(destaques.gols.mes) },
+          ]}
+        />
+
+        <CardEstatistica
+          icone={Star}
+          titulo="Votos MVP"
+          corIcone="text-gold"
+          colunas={[
+            { label: "Total", valor: String(destaques.mvp.votos.total) },
+            { label: "Ano", valor: String(destaques.mvp.votos.ano) },
+            { label: "Mês", valor: String(destaques.mvp.votos.mes) },
+          ]}
+        />
+
+        <CardEstatistica
+          icone={Trophy}
+          titulo="Eleito Craque"
+          corIcone="text-gold"
+          colunas={[
+            { label: "Total", valor: String(destaques.mvp.eleito.total) },
+            { label: "Ano", valor: String(destaques.mvp.eleito.ano) },
+            { label: "Mês", valor: String(destaques.mvp.eleito.mes) },
+          ]}
+        />
+
+        <CardPresenca presenca={destaques.presenca} />
+      </div>
+    </div>
+  );
+}
+
 const PARTIDAS_POR_PAGINA = 5;
 
 // Conteúdo da aba de histórico de partidas do jogador, com paginação
@@ -402,7 +746,9 @@ function AbaPartidas({
                         {partida.votosRecebidos}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {partida.votosRecebidos === 1 ? "voto MVP" : "votos MVP"}
+                        {partida.votosRecebidos === 1
+                          ? "voto MVP"
+                          : "votos MVP"}
                       </span>
                     </span>
                   </div>
@@ -497,7 +843,16 @@ export default function PerfilJogadorPage() {
     PartidaHistorico[] | null
   >(null);
   const [carregandoPartidas, setCarregandoPartidas] = useState(false);
-  const [anoMensalidade, setAnoMensalidade] = useState(new Date().getFullYear());
+  const [destaques, setDestaques] = useState<Destaques | null>(null);
+  const [carregandoDestaques, setCarregandoDestaques] = useState(false);
+  const [anoMensalidade, setAnoMensalidade] = useState(
+    new Date().getFullYear(),
+  );
+  const [transacoes, setTransacoes] = useState<Transacao[] | null>(null);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(false);
+  const [paginaTransacoes, setPaginaTransacoes] = useState(1);
+  const [totalPaginasTransacoes, setTotalPaginasTransacoes] = useState(1);
+  const [totalTransacoes, setTotalTransacoes] = useState(0);
 
   const carregarDados = useCallback(async () => {
     setCarregando(true);
@@ -582,6 +937,63 @@ export default function PerfilJogadorPage() {
     }
   }, [aba, partidasHistorico, carregarHistoricoPartidas]);
 
+  // Busca as estatísticas de destaque somente quando a aba for selecionada pela primeira vez
+  const carregarDestaques = useCallback(async () => {
+    setCarregandoDestaques(true);
+    try {
+      const resposta = await fetch(`/api/users/${id}/highlights`);
+      if (resposta.ok) {
+        setDestaques(await resposta.json());
+      }
+    } finally {
+      setCarregandoDestaques(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (aba === "destaques" && destaques === null) {
+      carregarDestaques();
+    }
+  }, [aba, destaques, carregarDestaques]);
+
+  // Busca uma página do histórico financeiro do jogador na API (paginação no servidor)
+  const carregarTransacoes = useCallback(
+    async (pagina: number) => {
+      setCarregandoTransacoes(true);
+      try {
+        const resposta = await fetch(
+          `/api/users/${id}/transactions?page=${pagina}`,
+        );
+        if (resposta.ok) {
+          const dados = await resposta.json();
+          setTransacoes(
+            Array.isArray(dados.transacoes) ? dados.transacoes : [],
+          );
+          setTotalPaginasTransacoes(dados.totalPaginas ?? 1);
+          setTotalTransacoes(dados.total ?? 0);
+        }
+      } catch {
+        setTransacoes([]);
+      } finally {
+        setCarregandoTransacoes(false);
+      }
+    },
+    [id],
+  );
+
+  // Carrega a primeira página somente quando a aba for selecionada pela primeira vez
+  useEffect(() => {
+    if (aba === "pagamentos" && transacoes === null) {
+      carregarTransacoes(1);
+    }
+  }, [aba, transacoes, carregarTransacoes]);
+
+  // Troca de página da paginação de transações, disparando nova busca no servidor
+  function mudarPaginaTransacoes(pagina: number) {
+    setPaginaTransacoes(pagina);
+    carregarTransacoes(pagina);
+  }
+
   async function suspender() {
     if (!jogador) return;
     setSuspendendo(true);
@@ -645,6 +1057,7 @@ export default function PerfilJogadorPage() {
 
   const abas: { key: AbaAtiva; label: string }[] = [
     { key: "mensalidades", label: "Mensalidades" },
+    { key: "pagamentos", label: "Pagamentos" },
     { key: "partidas", label: "Partidas" },
     { key: "destaques", label: "Destaques" },
   ];
@@ -683,10 +1096,6 @@ export default function PerfilJogadorPage() {
                 </DropdownMenuItem>
                 {ehGestor && (
                   <>
-                    <DropdownMenuItem>
-                      <Star className="size-4 mr-2" />
-                      Isentar Mensalidade
-                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
@@ -945,131 +1354,134 @@ export default function PerfilJogadorPage() {
         </div>
 
         {/* Aba: Mensalidades */}
-        {aba === "mensalidades" && (() => {
-          // Anos disponíveis extraídos das mensalidades, mais o ano atual sempre presente
-          const anosDisponiveis = Array.from(
-            new Set([
-              new Date().getFullYear(),
-              ...mensalidades.map((m) => m.year),
-            ]),
-          ).sort((a, b) => b - a);
+        {aba === "mensalidades" &&
+          (() => {
+            // Anos disponíveis extraídos das mensalidades, mais o ano atual sempre presente
+            const anosDisponiveis = Array.from(
+              new Set([
+                new Date().getFullYear(),
+                ...mensalidades.map((m) => m.year),
+              ]),
+            ).sort((a, b) => b - a);
 
-          // Mensalidades filtradas pelo ano selecionado
-          const mensalidadesFiltradas = mensalidades.filter(
-            (m) => m.year === anoMensalidade,
-          );
+            // Mensalidades filtradas pelo ano selecionado
+            const mensalidadesFiltradas = mensalidades.filter(
+              (m) => m.year === anoMensalidade,
+            );
 
-          const semDados = mensalidadesFiltradas.length === 0;
+            const semDados = mensalidadesFiltradas.length === 0;
 
-          return (
-            <>
-              {/* Seletor de ano por setas */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-                <button
-                  onClick={() =>
-                    setAnoMensalidade((a) =>
-                      anosDisponiveis[anosDisponiveis.indexOf(a) + 1] ?? a,
-                    )
-                  }
-                  disabled={
-                    anosDisponiveis.indexOf(anoMensalidade) ===
-                    anosDisponiveis.length - 1
-                  }
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="size-4" />
-                </button>
+            return (
+              <>
+                {/* Seletor de ano por setas */}
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+                  <button
+                    onClick={() =>
+                      setAnoMensalidade(
+                        (a) =>
+                          anosDisponiveis[anosDisponiveis.indexOf(a) + 1] ?? a,
+                      )
+                    }
+                    disabled={
+                      anosDisponiveis.indexOf(anoMensalidade) ===
+                      anosDisponiveis.length - 1
+                    }
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
 
-                <span className="text-sm font-medium text-foreground">
-                  {anoMensalidade}
-                </span>
+                  <span className="text-sm font-medium text-foreground">
+                    {anoMensalidade}
+                  </span>
 
-                <button
-                  onClick={() =>
-                    setAnoMensalidade((a) =>
-                      anosDisponiveis[anosDisponiveis.indexOf(a) - 1] ?? a,
-                    )
-                  }
-                  disabled={anosDisponiveis.indexOf(anoMensalidade) === 0}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
-              </div>
+                  <button
+                    onClick={() =>
+                      setAnoMensalidade(
+                        (a) =>
+                          anosDisponiveis[anosDisponiveis.indexOf(a) - 1] ?? a,
+                      )
+                    }
+                    disabled={anosDisponiveis.indexOf(anoMensalidade) === 0}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
 
-              {/* Desktop: tabela completa */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Competência</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Valor</TableHead>
-                      <TableHead>Data Pgto.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {semDados ? (
+                {/* Desktop: tabela completa */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={4}
-                          className="h-28 text-center text-muted-foreground"
-                        >
-                          {jogador.is_goalkeeper
-                            ? "Goleiro isento de mensalidade."
-                            : `Nenhuma mensalidade registrada em ${anoMensalidade}.`}
-                        </TableCell>
+                        <TableHead>Competência</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Data Pgto.</TableHead>
                       </TableRow>
-                    ) : (
-                      mensalidadesFiltradas.map((m) => (
-                        <TableRow key={m.id}>
-                          <TableCell className="font-medium">
-                            {MESES[m.month - 1]}
-                          </TableCell>
-                          <TableCell>
-                            <BadgeMensalidade status={m.status} />
-                          </TableCell>
-                          <TableCell>{formatarValor(m.amount)}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatarDataPagamento(m.paid_at)}
+                    </TableHeader>
+                    <TableBody>
+                      {semDados ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            className="h-28 text-center text-muted-foreground"
+                          >
+                            {jogador.is_goalkeeper
+                              ? "Goleiro isento de mensalidade."
+                              : `Nenhuma mensalidade registrada em ${anoMensalidade}.`}
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      ) : (
+                        mensalidadesFiltradas.map((m) => (
+                          <TableRow key={m.id}>
+                            <TableCell className="font-medium">
+                              {MESES[m.month - 1]}
+                            </TableCell>
+                            <TableCell>
+                              <BadgeMensalidade status={m.status} />
+                            </TableCell>
+                            <TableCell>{formatarValor(m.amount)}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatarDataPagamento(m.paid_at)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
-              {/* Mobile: lista compacta */}
-              <div className="md:hidden divide-y divide-border">
-                {semDados ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    {jogador.is_goalkeeper
-                      ? "Goleiro isento de mensalidade."
-                      : `Nenhuma mensalidade registrada em ${anoMensalidade}.`}
-                  </div>
-                ) : (
-                  mensalidadesFiltradas.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between px-4 py-3"
-                    >
-                      <span className="text-sm font-medium text-foreground">
-                        {MESES[m.month - 1]}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <BadgeMensalidade status={m.status} />
-                        <span className="text-xs text-muted-foreground">
-                          · {formatarValor(m.amount)}
-                        </span>
-                      </div>
+                {/* Mobile: lista compacta */}
+                <div className="md:hidden divide-y divide-border">
+                  {semDados ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      {jogador.is_goalkeeper
+                        ? "Goleiro isento de mensalidade."
+                        : `Nenhuma mensalidade registrada em ${anoMensalidade}.`}
                     </div>
-                  ))
-                )}
-              </div>
-            </>
-          );
-        })()}
+                  ) : (
+                    mensalidadesFiltradas.map((m) => (
+                      <div
+                        key={m.id}
+                        className="flex items-center justify-between px-4 py-3"
+                      >
+                        <span className="text-sm font-medium text-foreground">
+                          {MESES[m.month - 1]}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <BadgeMensalidade status={m.status} />
+                          <span className="text-xs text-muted-foreground">
+                            · {formatarValor(m.amount)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
         {/* Aba: Partidas */}
         {aba === "partidas" && (
@@ -1080,12 +1492,25 @@ export default function PerfilJogadorPage() {
           />
         )}
 
+        {/* Aba: Pagamentos */}
+        {aba === "pagamentos" && (
+          <AbaPagamentos
+            transacoes={transacoes}
+            carregando={carregandoTransacoes}
+            paginaAtual={paginaTransacoes}
+            totalPaginas={totalPaginasTransacoes}
+            totalRegistros={totalTransacoes}
+            aoMudarPagina={mudarPaginaTransacoes}
+          />
+        )}
+
         {/* Aba: Destaques */}
         {aba === "destaques" && (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-            <Trophy className="size-8 opacity-30" />
-            <p className="text-sm">Destaques em breve.</p>
-          </div>
+          <AbaDestaques
+            destaques={destaques}
+            carregando={carregandoDestaques}
+            ehGoleiro={jogador.is_goalkeeper}
+          />
         )}
       </div>
 
@@ -1099,10 +1524,6 @@ export default function PerfilJogadorPage() {
           >
             <Pencil className="size-4 mr-2" />
             Editar Cadastro
-          </Button>
-          <Button className={"bg-white"} variant="outline">
-            <Star className="size-4 mr-2" />
-            Isentar Mensalidade
           </Button>
           <Button
             variant="outline"

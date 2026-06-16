@@ -151,12 +151,13 @@ function MvpCard({
             )}
           </div>
 
-          {mvp && (
-            <div className="flex items-center justify-center rounded-full size-14 bg-accent-foreground/15 shrink-0">
-              <span className="font-heading text-2xl text-accent-foreground leading-none">
-                {mvp.votos}
-              </span>
-            </div>
+          {mvp?.jogador && (
+            <PlayerAvatar
+              name={mvp.jogador.name}
+              src={mvp.jogador.photo_url ?? undefined}
+              size="lg"
+              className="shrink-0"
+            />
           )}
         </div>
       </CardContent>
@@ -417,7 +418,7 @@ function PartidasMvpCard({
         <div className="flex items-center gap-2">
           <Star className="size-3.5 text-muted-foreground" />
           <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Partidas com MVP · {mon}
+            Partidas · {mon}
           </span>
         </div>
       </CardHeader>

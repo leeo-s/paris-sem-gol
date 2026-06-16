@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/config/supabase/server";
 import { getSessionUser } from "@/lib/get-session-user";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -11,13 +10,8 @@ export default async function PartidasLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
   const sessionUser = await getSessionUser();
+  if (!sessionUser) redirect("/login");
 
   return (
     <SidebarProvider

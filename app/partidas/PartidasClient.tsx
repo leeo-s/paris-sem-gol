@@ -17,6 +17,8 @@ import {
   Trash2,
   Shuffle,
   Vote,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +99,9 @@ type Partida = {
 };
 
 type FiltroTab = "todas" | "em_aberto" | "em_andamento" | "encerradas";
+
+// Quantidade de partidas encerradas exibidas por página
+const PARTIDAS_ENCERRADAS_POR_PAGINA = 5;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -734,6 +739,9 @@ export function PartidasClient({
   const [partidas, setPartidas] = useState<Partida[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  // Página atual da listagem de partidas encerradas (0-indexed)
+  const [paginaEncerradas, setPaginaEncerradas] = useState(0);
+
   // ─── estado do modal de confirmação de exclusão ───────────────────────────
   const [idPartidaParaExcluir, setIdPartidaParaExcluir] = useState<
     string | null
@@ -919,6 +927,24 @@ export function PartidasClient({
   const encerradas = partidas.filter(
     (p) => p.status === "completed" || p.status === "cancelled",
   );
+
+  // Paginação das partidas encerradas — mantém apenas 5 por página
+  const totalPaginasEncerradas = Math.max(
+    1,
+    Math.ceil(encerradas.length / PARTIDAS_ENCERRADAS_POR_PAGINA),
+  );
+  const encerradasPaginadas = encerradas.slice(
+    paginaEncerradas * PARTIDAS_ENCERRADAS_POR_PAGINA,
+    (paginaEncerradas + 1) * PARTIDAS_ENCERRADAS_POR_PAGINA,
+  );
+
+  // Garante que a página atual nunca fique fora do intervalo válido
+  // (ex: após excluir uma partida ou recarregar a lista)
+  useEffect(() => {
+    if (paginaEncerradas > totalPaginasEncerradas - 1) {
+      setPaginaEncerradas(Math.max(0, totalPaginasEncerradas - 1));
+    }
+  }, [paginaEncerradas, totalPaginasEncerradas]);
 
   const mostrarAbertas = filtro === "todas" || filtro === "em_aberto";
   const mostrarEmAndamento = filtro === "todas" || filtro === "em_andamento";
@@ -1247,15 +1273,51 @@ export function PartidasClient({
                   Nenhuma partida encerrada.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {encerradas.map((p) => (
-                    <CartaoEncerrada
-                      key={p.id}
-                      partida={p}
-                      currentUserId={currentUserId}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-3">
+                    {encerradasPaginadas.map((p) => (
+                      <CartaoEncerrada
+                        key={p.id}
+                        partida={p}
+                        currentUserId={currentUserId}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Navegação entre páginas — exibida apenas quando há mais de uma página */}
+                  {totalPaginasEncerradas > 1 && (
+                    <div className="flex items-center justify-center gap-3 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setPaginaEncerradas((p) => Math.max(0, p - 1))
+                        }
+                        disabled={paginaEncerradas === 0}
+                      >
+                        <ChevronLeft className="size-3.5" />
+                        Anterior
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Página {paginaEncerradas + 1} de{" "}
+                        {totalPaginasEncerradas}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setPaginaEncerradas((p) =>
+                            Math.min(totalPaginasEncerradas - 1, p + 1),
+                          )
+                        }
+                        disabled={paginaEncerradas >= totalPaginasEncerradas - 1}
+                      >
+                        Próxima
+                        <ChevronRight className="size-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           )}

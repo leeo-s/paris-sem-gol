@@ -4,18 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Swords,
   Users,
-  BarChart2,
   MoreHorizontal,
   CircleDollarSign,
+  House,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MobileMenu } from "@/components/MobileMenu";
 
 const primaryItems = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Início", href: "/dashboard", icon: House },
   { title: "Partidas", href: "/partidas", icon: Swords },
   { title: "Jogadores", href: "/jogadores", icon: Users },
   { title: "Financeiro", href: "/financeiro", icon: CircleDollarSign },

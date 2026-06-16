@@ -15,12 +15,15 @@ import {
 export interface ItemDaLista {
   id: string
   name: string
+  /** Texto secundário opcional (ex: apelido), exibido menor e mais claro abaixo do nome */
+  nickname?: string | null
 }
 
 // Formato interno compatível com o auto-detect { value, label } do base-ui
 interface ItemInterno {
   value: string
   label: string
+  nickname?: string | null
 }
 
 export interface DatalistInputProps {
@@ -53,7 +56,12 @@ export function DatalistInput({
 }: DatalistInputProps) {
   // Converte os itens para o formato { value, label } reconhecido pelo base-ui
   const itensMapeados = React.useMemo<ItemInterno[]>(
-    () => items.map((item) => ({ value: item.id, label: item.name })),
+    () =>
+      items.map((item) => ({
+        value: item.id,
+        label: item.name,
+        nickname: item.nickname,
+      })),
     [items]
   )
 
@@ -88,7 +96,15 @@ export function DatalistInput({
           <ComboboxCollection>
             {(item: ItemInterno) => (
               <ComboboxItem key={item.value} value={item}>
-                {item.label}
+                <span className="flex flex-col">
+                  <span>{item.label}</span>
+                  {/* Apelido exibido em fonte menor e cor mais fraca, quando disponível */}
+                  {item.nickname && (
+                    <span className="text-xs text-muted-foreground">
+                      {item.nickname}
+                    </span>
+                  )}
+                </span>
               </ComboboxItem>
             )}
           </ComboboxCollection>

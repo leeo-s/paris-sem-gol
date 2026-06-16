@@ -371,6 +371,7 @@ type FeePendente = {
 type UsuarioComFeesPendentes = {
   id: string;
   name: string;
+  nickname: string | null;
   fees: FeePendente[];
 };
 
@@ -410,7 +411,7 @@ function DialogoNovoLancamento({
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
   const [mensalidadeId, setMensalidadeId] = useState<string | null>(null);
   const [todosUsuarios, setTodosUsuarios] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; nickname: string | null }[]
   >([]);
   const [usuariosComFeesPendentes, setUsuariosComFeesPendentes] = useState<
     UsuarioComFeesPendentes[]
@@ -504,7 +505,11 @@ function DialogoNovoLancamento({
   // Lista de itens exibida no DatalistInput varia conforme a categoria
   const itensParaDatalist =
     categoria === "monthly_fee"
-      ? usuariosComFeesPendentes.map((u) => ({ id: u.id, name: u.name }))
+      ? usuariosComFeesPendentes.map((u) => ({
+          id: u.id,
+          name: u.name,
+          nickname: u.nickname,
+        }))
       : todosUsuarios;
 
   async function salvar() {
@@ -1107,6 +1112,8 @@ export default function FinanceiroPage() {
 
   const [resumoAno, setResumoAno] = useState<ResumoAno | null>(null);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [paginaTransacoes, setPaginaTransacoes] = useState(1);
+  const [paginaMensalidades, setPaginaMensalidades] = useState(1);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
   const [vendas, setVendas] = useState<VendaCamisa[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -1141,6 +1148,12 @@ export default function FinanceiroPage() {
   useEffect(() => {
     buscarDados();
   }, [buscarDados]);
+
+  // reinicia a paginação sempre que o mês/ano selecionado mudar
+  useEffect(() => {
+    setPaginaTransacoes(1);
+    setPaginaMensalidades(1);
+  }, [mes, ano]);
 
   function mesAnterior() {
     if (mes === 1) {
@@ -1196,6 +1209,28 @@ export default function FinanceiroPage() {
 
   const labelMes = `${MESES[mes - 1]} ${ano}`;
   const transacoesRecentes = [...transacoes].slice(0, 6);
+
+  // paginação da aba "transações": 10 itens por página
+  const TRANSACOES_POR_PAGINA = 10;
+  const totalPaginasTransacoes = Math.max(
+    1,
+    Math.ceil(transacoes.length / TRANSACOES_POR_PAGINA),
+  );
+  const transacoesPaginadas = transacoes.slice(
+    (paginaTransacoes - 1) * TRANSACOES_POR_PAGINA,
+    paginaTransacoes * TRANSACOES_POR_PAGINA,
+  );
+
+  // paginação da aba "mensalistas": 10 registros por página
+  const MENSALIDADES_POR_PAGINA = 10;
+  const totalPaginasMensalidades = Math.max(
+    1,
+    Math.ceil(mensalidades.length / MENSALIDADES_POR_PAGINA),
+  );
+  const mensalidadesPaginadas = mensalidades.slice(
+    (paginaMensalidades - 1) * MENSALIDADES_POR_PAGINA,
+    paginaMensalidades * MENSALIDADES_POR_PAGINA,
+  );
 
   async function marcarPago(id: string) {
     const res = await fetch(`/api/financial/monthly-fees/${id}`, {
@@ -1474,27 +1509,69 @@ export default function FinanceiroPage() {
                     Nenhuma mensalidade registrada em {labelMes}.
                   </div>
                 ) : (
-                  <div className="divide-y divide-border">
-                    {mensalidades.map((m) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center justify-between px-5 py-3.5 gap-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground leading-none truncate">
-                            {m.users.nickname ?? m.users.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {MESES[m.month - 1]} {m.year} ·{" "}
-                            {brl(Number(m.amount))}
-                          </p>
+                  <>
+                    <div className="divide-y divide-border">
+                      {mensalidadesPaginadas.map((m) => (
+                        <div
+                          key={m.id}
+                          className="flex items-center justify-between px-5 py-3.5 gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground leading-none truncate">
+                              {m.users.nickname ?? m.users.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {MESES[m.month - 1]} {m.year} ·{" "}
+                              {brl(Number(m.amount))}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <BadgeStatusMensalidade status={m.status} />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <BadgeStatusMensalidade status={m.status} />
+                      ))}
+                    </div>
+
+                    {totalPaginasMensalidades > 1 && (
+                      <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                        <span className="text-xs text-muted-foreground">
+                          Página {paginaMensalidades} de{" "}
+                          {totalPaginasMensalidades}
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-8"
+                            disabled={paginaMensalidades <= 1}
+                            onClick={() =>
+                              setPaginaMensalidades((p) => Math.max(1, p - 1))
+                            }
+                            aria-label="Página anterior"
+                          >
+                            <ChevronLeft className="size-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-8"
+                            disabled={
+                              paginaMensalidades >= totalPaginasMensalidades
+                            }
+                            onClick={() =>
+                              setPaginaMensalidades((p) =>
+                                Math.min(totalPaginasMensalidades, p + 1),
+                              )
+                            }
+                            aria-label="Próxima página"
+                          >
+                            <ChevronRight className="size-4" />
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1522,11 +1599,51 @@ export default function FinanceiroPage() {
                     Nenhuma transação em {labelMes}.
                   </div>
                 ) : (
-                  <div className="divide-y divide-border px-5">
-                    {transacoes.map((t) => (
-                      <ItemTransacao key={t.id} transacao={t} />
-                    ))}
-                  </div>
+                  <>
+                    <div className="divide-y divide-border px-5">
+                      {transacoesPaginadas.map((t) => (
+                        <ItemTransacao key={t.id} transacao={t} />
+                      ))}
+                    </div>
+
+                    {totalPaginasTransacoes > 1 && (
+                      <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                        <span className="text-xs text-muted-foreground">
+                          Página {paginaTransacoes} de{" "}
+                          {totalPaginasTransacoes}
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-8"
+                            disabled={paginaTransacoes <= 1}
+                            onClick={() =>
+                              setPaginaTransacoes((p) => Math.max(1, p - 1))
+                            }
+                            aria-label="Página anterior"
+                          >
+                            <ChevronLeft className="size-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-8"
+                            disabled={paginaTransacoes >= totalPaginasTransacoes}
+                            onClick={() =>
+                              setPaginaTransacoes((p) =>
+                                Math.min(totalPaginasTransacoes, p + 1),
+                              )
+                            }
+                            aria-label="Próxima página"
+                          >
+                            <ChevronRight className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

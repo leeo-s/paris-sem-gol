@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
-  Trophy,
+  House,
   Users,
   User,
   BarChart2,
@@ -30,11 +29,11 @@ import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { createBrowserSupabaseClient } from "@/config/supabase/client";
 
 const navItems = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Início", href: "/dashboard", icon: House },
   { title: "Partidas", href: "/partidas", icon: Swords },
   { title: "Jogadores", href: "/jogadores", icon: Users },
   { title: "Financeiro", href: "/financeiro", icon: CircleDollarSign },
-  // { title: "Classificação", href: "/rank", icon: BarChart2 },
+  { title: "Classificação", href: "/rank", icon: BarChart2 },
   // { title: "Torneios", href: "/campeonatos", icon: Trophy },
 ];
 

@@ -77,8 +77,9 @@ function construirParams(
   params.set("page", pagina.toString());
   if (busca) params.set("search", busca);
 
+  // "Ativos" não envia parâmetro extra: a API já filtra por is_active = true
+  // por padrão quando includeInactive não é informado.
   if (filtro === "todos") params.set("includeInactive", "true");
-  if (filtro === "ativos") params.set("filter", "ativos");
   if (filtro === "inadimplente") params.set("filter", "inadimplente");
   if (filtro === "gk") params.set("is_goalkeeper", "true");
 
@@ -278,18 +279,17 @@ export default function ElencoPage() {
       return;
     }
 
-    const resSessao = await fetch("/api/auth/me");
-
-    const dadosSessao = await resSessao.json();
-
-    setSessao(dadosSessao?.id ? dadosSessao : null);
-
     setCarregando(true);
     try {
       const params = construirParams(filtro, buscaDebounced, pagina);
-      const res = await fetch(`/api/users?${params}`);
+      const [resSessao, res] = await Promise.all([
+        fetch("/api/auth/me"),
+        fetch(`/api/users?${params}`),
+      ]);
       if (!res.ok) throw new Error("Erro ao buscar jogadores");
-      const dados: RespostaApi = await res.json();
+      const [dadosSessao, dados]: [SessaoUsuario, RespostaApi] =
+        await Promise.all([resSessao.json(), res.json()]);
+      setSessao(dadosSessao?.id ? dadosSessao : null);
       setJogadores(dados.data);
       setTotal(dados.total);
       setPageSize(dados.pageSize);

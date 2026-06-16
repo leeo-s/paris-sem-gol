@@ -221,3 +221,67 @@
     font-family: var(--font-sans);
   }
 }
+
+/* ===== BRILHO DOURADO PULSANTE (craque do ano / destaques) ===== */
+@layer utilities {
+  @keyframes glow-gold {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 oklch(0.745 0.12 72 / 0.45);
+    }
+    50% {
+      box-shadow: 0 0 36px 6px oklch(0.745 0.12 72 / 0.55);
+    }
+  }
+  .animate-glow-gold {
+    animation: glow-gold 2.4s ease-in-out infinite;
+  }
+}
+
+/* ===== LINHA DOURADA GIRANDO NA BORDA (1º colocado dos destaques) ===== */
+/* Registra o ângulo como propriedade animável para o navegador interpolar
+   a rotação do conic-gradient suavemente (degrada para borda estática nos
+   navegadores sem suporte a @property, sem quebrar o layout) */
+@property --border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@layer utilities {
+  @keyframes border-spin {
+    to {
+      --border-angle: 360deg;
+    }
+  }
+
+  .border-spin-gold {
+    --border-angle: 0deg;
+    border: 3px solid transparent;
+    background:
+      linear-gradient(var(--card), var(--card)) padding-box,
+      /* Brilho que percorre a borda — o mesmo padrão é repetido duas vezes,
+         deslocado 180°, criando dois brilhos opostos girando juntos */
+      conic-gradient(
+          from var(--border-angle),
+          transparent 0deg,
+          transparent 85deg,
+          oklch(0.745 0.12 72 / 0.2) 100deg,
+          oklch(0.745 0.12 72 / 0.85) 130deg,
+          oklch(0.96 0.05 95) 160deg,
+          oklch(0.745 0.12 72 / 0.85) 175deg,
+          transparent 180deg,
+          transparent 265deg,
+          oklch(0.745 0.12 72 / 0.2) 280deg,
+          oklch(0.745 0.12 72 / 0.85) 310deg,
+          oklch(0.96 0.05 95) 340deg,
+          oklch(0.745 0.12 72 / 0.85) 355deg,
+          transparent 360deg
+        )
+        border-box,
+      /* Base dourada sólida — garante que a borda inteira já fique dourada,
+         mesmo onde o brilho giratório acima está transparente */
+      var(--gold) border-box;
+    animation: border-spin 6s linear infinite;
+  }
+}

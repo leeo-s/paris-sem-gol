@@ -48,16 +48,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Busca o perfil do usuário via API para verificar se é o primeiro acesso
-    const resposta = await fetch("/api/auth/me");
-    const perfilUsuario = resposta.ok ? await resposta.json() : null;
-
-    // Primeiro login: redireciona para cadastrar senha pessoal
-    if (!perfilUsuario?.first_login_at) {
-      router.push("/criar-senha");
-    } else {
-      router.push("/dashboard");
-    }
+    // O dashboard layout verifica first_login_at e redireciona para /criar-senha se necessário
+    router.push("/dashboard");
   }
 
   // Evita piscar o formulário enquanto a sessão é verificada

@@ -5,17 +5,13 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 
-export default async function ConfigurationLayout({
+export default async function RankLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) redirect("/login");
-
-  if (sessionUser.role !== "admin" && sessionUser.role !== "co_admin") {
-    redirect("/dashboard");
-  }
 
   return (
     <SidebarProvider

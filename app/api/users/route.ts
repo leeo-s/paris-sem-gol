@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl;
 
-    // Modo simplificado: retorna todos os usuários ativos como {id, name} sem paginação
+    // Modo simplificado: retorna todos os usuários ativos como {id, name, nickname} sem paginação
     if (searchParams.get("all") === "true") {
       const todosUsuarios = await prisma.users.findMany({
         where: { is_active: true },
@@ -30,12 +30,7 @@ export async function GET(request: NextRequest) {
         orderBy: { name: "asc" },
       });
 
-      const usuariosFormatados = todosUsuarios.map((usuario) => ({
-        id: usuario.id,
-        name: usuario.nickname ?? usuario.name,
-      }));
-
-      return NextResponse.json(usuariosFormatados);
+      return NextResponse.json(todosUsuarios);
     }
 
     const filtroRole = searchParams.get("role") ?? undefined;
@@ -71,11 +66,6 @@ export async function GET(request: NextRequest) {
           { name: { contains: busca, mode: "insensitive" } },
           { nickname: { contains: busca, mode: "insensitive" } },
         ],
-      }),
-      ...(filtroEspecial === "ativos" && {
-        monthly_roster: {
-          some: { month: mesAtual, year: anoAtual, status: "active" },
-        },
       }),
       ...(filtroEspecial === "inadimplente" && {
         // Mesma lógica do BadgeMensalidade: não-goleiro, ativo no elenco e sem mensalidade paga
