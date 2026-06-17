@@ -24,11 +24,90 @@ export type ResultadoPaginado<T> = {
   total: number;
 };
 
+// ─── ranking de destaques da temporada (pódio) ──────────────────────────────────
+
+// Monta o ranking completo (sem limite) de todos os participantes do ano, ordenado
+// pelos critérios do pódio: +premiações MVP, +votos MVP, +presenças, +gols.
+// Base: qualquer jogador que esteve em pelo menos uma partida concluída no ano.
+export async function buscarRankingDestaques(
+  ano: number,
+): Promise<ArtilheiroAno[]> {
+  const inicioAno = new Date(Date.UTC(ano, 0, 1));
+  const fimAno = new Date(Date.UTC(ano, 11, 31, 23, 59, 59, 999));
+  const filtroPartidasAno = { match_date: { gte: inicioAno, lte: fimAno } };
+
+  // Todos os jogadores que participaram de pelo menos uma partida concluída no ano
+  const gruposParticipacoes = await prisma.match_players.groupBy({
+    by: ["user_id"],
+    where: {
+      user_id: { not: null },
+      matches: { status: "completed", ...filtroPartidasAno },
+    },
+    _count: { match_id: true },
+  });
+
+  // Para cada participante, busca em paralelo os dados de desempate
+  const candidatos = await Promise.all(
+    gruposParticipacoes.map(async (participacao) => {
+      const candidatoId = participacao.user_id as string;
+      const [premiacoesMvp, votos, gols] = await Promise.all([
+        prisma.monthly_awards.count({
+          where: { mvp_user_id: candidatoId, year: ano },
+        }),
+        prisma.mvp_votes.count({
+          where: { voted_user_id: candidatoId, matches: filtroPartidasAno },
+        }),
+        prisma.goals.count({
+          where: {
+            scorer_user_id: candidatoId,
+            matches: { ...filtroPartidasAno, status: "completed" },
+          },
+        }),
+      ]);
+
+      return {
+        id: candidatoId,
+        goals: gols,
+        premiacoesMvp,
+        votos,
+        participacoes: participacao._count.match_id,
+      };
+    }),
+  );
+
+  // Critérios em cascata: MVPs → votos → presenças → gols
+  candidatos.sort(
+    (a, b) =>
+      b.premiacoesMvp - a.premiacoesMvp ||
+      b.votos - a.votos ||
+      b.participacoes - a.participacoes ||
+      b.goals - a.goals,
+  );
+
+  const jogadores = await prisma.users.findMany({
+    where: { id: { in: candidatos.map((c) => c.id) } },
+    select: { id: true, name: true, nickname: true, photo_url: true, position: true },
+  });
+  const mapaJogadores = new Map<string, JogadorResumido>(
+    jogadores.map((j) => [j.id, j]),
+  );
+
+  return candidatos
+    .filter((c) => mapaJogadores.has(c.id))
+    .map((c) => ({
+      ...mapaJogadores.get(c.id)!,
+      goals: c.goals,
+      mvpAwards: c.premiacoesMvp,
+      votes: c.votos,
+      presences: c.participacoes,
+    }));
+}
+
 // ─── ranking de artilheiros do ano ──────────────────────────────────────────────
 
-// Monta o ranking completo (sem limite) de artilheiros do ano, já ordenado com o
-// desempate usado tanto no pódio quanto na lista paginada de artilharia: +gols,
-// +premiações de MVP no ano, +votos de MVP no ano, +participações
+// Monta o ranking completo (sem limite) de artilheiros do ano, ordenado por gols
+// com desempate por: +premiações MVP, +votos MVP, +participações.
+// Usado exclusivamente pela lista paginada de artilharia (/season/scorers).
 export async function buscarRankingArtilheirosAno(
   ano: number,
 ): Promise<ArtilheiroAno[]> {
@@ -36,6 +115,7 @@ export async function buscarRankingArtilheirosAno(
   const fimAno = new Date(Date.UTC(ano, 11, 31, 23, 59, 59, 999));
   const filtroPartidasAno = { match_date: { gte: inicioAno, lte: fimAno } };
 
+  // Base: apenas jogadores que marcaram pelo menos um gol no ano
   const gruposGols = await prisma.goals.groupBy({
     by: ["scorer_user_id"],
     where: {
@@ -46,6 +126,7 @@ export async function buscarRankingArtilheirosAno(
     orderBy: { _count: { scorer_user_id: "desc" } },
   });
 
+  // Para cada artilheiro, busca em paralelo os dados de desempate
   const candidatosComDesempate = await Promise.all(
     gruposGols.map(async (g) => {
       const candidatoId = g.scorer_user_id as string;
@@ -74,6 +155,7 @@ export async function buscarRankingArtilheirosAno(
     }),
   );
 
+  // Critérios em cascata: gols → MVPs → votos → presenças
   candidatosComDesempate.sort(
     (a, b) =>
       b.goals - a.goals ||

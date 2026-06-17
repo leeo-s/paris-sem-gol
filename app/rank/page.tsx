@@ -255,11 +255,11 @@ function CardPodio({ jogador }: { jogador: ItemPodio }) {
               : "text-xl md:text-2xl text-foreground",
           )}
         >
-          {jogador.goals} <span className="text-base">gols</span>
+          {jogador.mvpAwards} <span className="text-base">MVPs</span>
         </p>
 
         <p className="text-xs text-muted-foreground">
-          {pluralizar(jogador.mvpAwards, "MVP", "MVPs")} ·{" "}
+          {pluralizar(jogador.goals, "gol", "gols")} ·{" "}
           {pluralizar(jogador.votes, "voto", "votos")} ·{" "}
           {pluralizar(jogador.presences, "presença", "presenças")}
         </p>

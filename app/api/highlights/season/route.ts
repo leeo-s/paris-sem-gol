@@ -2,7 +2,7 @@ import { prisma } from "@/config/prisma";
 import { createServerSupabaseClient } from "@/config/supabase/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { buscarRankingArtilheirosAno } from "../_lib/ranking";
+import { buscarRankingDestaques } from "../_lib/ranking";
 
 type JogadorResumido = {
   id: string;
@@ -13,10 +13,10 @@ type JogadorResumido = {
 };
 
 // GET /api/highlights/season?year=2026 — retorna o pódio do ano (top 3
-// artilheiros, com empates desempatados por premiações de MVP, votos e
-// participações) e o top 5 fixo de gols sofridos no ano (sem paginação — os
-// demais destaques do ano, como artilharia e presença completas, têm
-// endpoints próprios com paginação: /season/scorers e /season/presence)
+// destaques, ordenados por: MVPs → votos MVP → presenças → gols) e o top 5
+// fixo de gols sofridos no ano (sem paginação — os demais destaques do ano,
+// como artilharia e presença completas, têm endpoints próprios com paginação:
+// /season/scorers e /season/presence)
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
     const filtroPartidasAno = { match_date: { gte: inicioAno, lte: fimAno } };
 
     const [ranking, gruposSofridos] = await Promise.all([
-      // Ranking completo de artilheiros do ano, já com o desempate do pódio
-      buscarRankingArtilheirosAno(ano),
+      // Ranking de destaques do ano: MVP → votos → presenças → gols
+      buscarRankingDestaques(ano),
 
       // Goleiros — top 5 fixo com menos gols sofridos no ano (mínimo 1 partida)
       prisma.goals_conceded.groupBy({
