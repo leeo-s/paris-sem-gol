@@ -29,11 +29,19 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/criar-senha")
-  ) {
+  const rotasPublicas = [
+    "/login",
+    "/criar-senha",
+    "/esqueci-senha",
+    "/redefinir-senha",
+  ];
+
+  const ehRotaPublica =
+    rotasPublicas.some((rota) =>
+      request.nextUrl.pathname.startsWith(rota),
+    ) || request.nextUrl.pathname.startsWith("/api/auth");
+
+  if (!user && !ehRotaPublica) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -43,5 +51,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|criar-senha).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|login|criar-senha|esqueci-senha|redefinir-senha|api/auth).*)",
+  ],
 };

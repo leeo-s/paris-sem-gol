@@ -10,6 +10,7 @@ import Image from "next/image";
 import logoImg from "@/public/logo.png";
 import { Avatar } from "@/components/ui/avatar";
 import { Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
+import Link from "next/link";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -154,14 +155,14 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Forgot password */}
+              {/* Link para recuperação de senha */}
               <div className="flex justify-end -mt-1">
-                <button
-                  type="button"
+                <Link
+                  href="/esqueci-senha"
                   className="text-sm text-gold hover:underline underline-offset-4"
                 >
                   Esqueci minha senha
-                </button>
+                </Link>
               </div>
 
               {error && <p className="text-destructive text-sm">{error}</p>}

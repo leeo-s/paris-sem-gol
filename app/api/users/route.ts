@@ -1,7 +1,8 @@
 import { prisma } from "@/config/prisma";
 import { createServerSupabaseClient } from "@/config/supabase/server";
 import { supabaseAdmin } from "@/config/supabase/admin";
-import { createClient } from "@supabase/supabase-js";
+import sendEmail from "@/config/nodemailer";
+import { messageCreateAccount } from "@/lib/emailMessages";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { buscarPerfilUsuario, ehAdminOuCoAdmin } from "../_lib/auth";
@@ -286,25 +287,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Envia email para o usuário definir sua própria senha
-    const { data: convite, error: erroAoEnviarEmail } =
-      await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/criar-senha`,
-      });
+    // const { data: convite, error: erroAoEnviarEmail } =
+    //   await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    //     redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/criar-senha`,
+    //   });
 
-    console.log("[POST /api/users] Resultado do invite:", {
-      data: convite,
-      error: erroAoEnviarEmail,
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/criar-senha`,
+    const emailMessage = messageCreateAccount({
+      username: novoJogador.nickname ? novoJogador.nickname : novoJogador.name,
+      userPassword: senhaTemporariaAleatoria,
     });
 
-    if (erroAoEnviarEmail) {
-      // Não bloqueia a resposta — o usuário foi criado com sucesso.
-      // O admin pode reenviar o email manualmente depois se necessário.
-      console.warn(
-        "[POST /api/users] Usuário criado, mas falha ao enviar email de redefinição de senha:",
-        erroAoEnviarEmail,
-      );
+    try {
+      const { response } = await sendEmail({
+        email: novoJogador.email,
+        subject: "Conta Criada",
+        message: emailMessage,
+      });
+    } catch (err) {
+      console.warn("Erro ao enviar o email de cadastro: ", err);
     }
+
+    // if (erroAoEnviarEmail) {
+    //   // Não bloqueia a resposta — o usuário foi criado com sucesso.
+    //   // O admin pode reenviar o email manualmente depois se necessário.
+    //   console.warn(
+    //     "[POST /api/users] Usuário criado, mas falha ao enviar email de redefinição de senha:",
+    //     erroAoEnviarEmail,
+    //   );
+    // }
 
     return NextResponse.json(
       { ...novoJogador, mensagem: `Convite enviado para ${email}` },
