@@ -363,7 +363,7 @@ function Paginacao({
       >
         <ChevronLeft className="size-3.5 text-foreground" />
       </button>
-      <span className="text-xs text-muted-foreground tabular-nums px-0.5 min-w-[32px] text-center">
+      <span className="text-xs text-muted-foreground tabular-nums px-0.5 min-w-8 text-center">
         {pagina}/{totalPaginas}
       </span>
       <button
@@ -447,7 +447,7 @@ function SeletorPeriodo({
       >
         <ChevronLeft className="size-4 text-foreground" />
       </button>
-      <span className="px-3 text-sm font-medium text-foreground whitespace-nowrap min-w-[110px] text-center">
+      <span className="px-3 text-sm font-medium text-foreground whitespace-nowrap min-w-27.5 text-center">
         {label}
       </span>
       <button
