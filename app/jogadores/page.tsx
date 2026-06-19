@@ -380,7 +380,7 @@ export default function ElencoPage() {
                 {contador !== null && (
                   <span
                     className={cn(
-                      "inline-flex items-center justify-center rounded-full text-xs font-bold min-w-[18px] h-[18px] px-1",
+                      "inline-flex items-center justify-center rounded-full text-xs font-bold min-w-4.5 h-4.5 px-1",
                       ativo
                         ? "bg-background/20 text-background"
                         : tab.value === "inadimplente"
@@ -413,7 +413,7 @@ export default function ElencoPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[280px]">Jogador</TableHead>
+              <TableHead className="w-70">Jogador</TableHead>
               <TableHead>Posição</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Mensalidade</TableHead>
