@@ -69,7 +69,7 @@ export async function POST(
                 is_goalkeeper: perfilUsuario?.is_goalkeeper ?? false,
                 confirmed: true,
             },
-            update: { confirmed: true },
+            update: { confirmed: true, unconfirmed_at: null },
         })
 
         return NextResponse.json(presencaConfirmada, { status: 201 })
@@ -103,7 +103,10 @@ export async function DELETE(
             return NextResponse.json({ error: 'Presença não encontrada' }, { status: 404 })
         }
 
-        await prisma.match_players.delete({ where: { id: presencaExistente.id } })
+        await prisma.match_players.update({
+            where: { id: presencaExistente.id },
+            data: { confirmed: false, unconfirmed_at: new Date() },
+        })
 
         return NextResponse.json({ message: 'Presença cancelada com sucesso' })
     } catch (error) {

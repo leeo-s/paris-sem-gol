@@ -87,6 +87,7 @@ type JogadorPartida = {
   guest_player_id: string | null;
   is_goalkeeper: boolean;
   confirmed: boolean;
+  unconfirmed_at: string | null;
   users: {
     id: string;
     name: string;
@@ -237,6 +238,17 @@ function isToday(dateStr: string): boolean {
     hoje.getMonth() === partida.getUTCMonth() &&
     hoje.getDate() === partida.getUTCDate()
   );
+}
+
+function formatarDataHora(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function nomeExibido(
@@ -597,6 +609,7 @@ function ViewAgendada({
   onRequestIniciar: () => void;
 }) {
   const confirmados = partida.match_players.filter((p) => p.confirmed);
+  const naoConfirmados = partida.match_players.filter((p) => !p.confirmed);
   const ehHoje = isToday(partida.match_date);
   const ehCancelada = partida.status === "cancelled";
   const horario = extrairHorario(partida.time);
@@ -735,7 +748,7 @@ function ViewAgendada({
                     {ehGoleiro && (
                       <Shield className="size-3.5 text-info shrink-0" />
                     )}
-                    {/* Botão de remoção visível apenas para admin/coadmin */}
+                    {/* Botão de cancelar participação visível apenas para admin/coadmin */}
                     {ehAdmin && (
                       <Button
                         size="icon"
@@ -751,6 +764,45 @@ function ViewAgendada({
               })}
             </div>
           )}
+        </section>
+      )}
+
+      {/* Não confirmados — quem cancelou a participação */}
+      {!ehCancelada && naoConfirmados.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-destructive/50" />
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Cancelaram ({naoConfirmados.length})
+            </h2>
+          </div>
+
+          <div className="bg-card rounded-xl ring-1 ring-foreground/10 divide-y divide-border overflow-hidden">
+            {naoConfirmados.map((p) => {
+              const nome = nomeExibido(p.users, p.guest_players);
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 px-4 py-3 opacity-60"
+                >
+                  <AvatarJogador
+                    nome={nome}
+                    photoUrl={p.users?.photo_url ?? null}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {nome}
+                    </p>
+                    {p.unconfirmed_at && (
+                      <p className="text-xs text-destructive">
+                        Cancelou em {formatarDataHora(p.unconfirmed_at)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
     </div>

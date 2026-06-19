@@ -101,6 +101,8 @@ export async function POST(
                 update: {
                     confirmed: confirmed ?? false,
                     is_goalkeeper: is_goalkeeper ?? false,
+                    // Limpa o timestamp ao re-confirmar um jogador
+                    unconfirmed_at: confirmed ? null : undefined,
                 },
                 include: {
                     users: { select: { id: true, name: true, nickname: true, is_goalkeeper: true } },
@@ -155,9 +157,12 @@ export async function DELETE(
             return NextResponse.json({ error: 'match_player_id é obrigatório' }, { status: 400 })
         }
 
-        await prisma.match_players.delete({ where: { id: match_player_id } })
+        await prisma.match_players.update({
+            where: { id: match_player_id },
+            data: { confirmed: false, unconfirmed_at: new Date() },
+        })
 
-        return NextResponse.json({ message: 'Jogador removido da lista de presentes' })
+        return NextResponse.json({ message: 'Participação cancelada' })
     } catch (error) {
         const respostaPrisma = tratarErroPrisma(error)
         if (respostaPrisma) return respostaPrisma

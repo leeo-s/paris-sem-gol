@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
         orderBy: { match_date: "asc" },
         include: {
           match_players: {
-            where: { user_id: user.id },
+            where: { user_id: user.id, confirmed: true },
             select: { id: true },
           },
         },

@@ -19,6 +19,7 @@ import {
   Vote,
   ChevronLeft,
   ChevronRight,
+  Type,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +80,7 @@ type Partida = {
   match_date: string;
   location: string | null;
   time: string;
+  title: string;
   status: MatchStatus;
   match_players: Array<{
     id: string;
@@ -321,7 +323,7 @@ function CartaoAberta({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-heading text-base tracking-wide text-foreground">
-                  Fut Semanal
+                  {partida.title ? partida.title : "Fut Semanal"}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
@@ -834,6 +836,7 @@ export function PartidasClient({
   const [modalAberto, setModalAberto] = useState(false);
   const [matchDate, setMatchDate] = useState("");
   const [location, setLocation] = useState("");
+  const [title, setTitle] = useState("");
   const [horario, setHorario] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erroModal, setErroModal] = useState<string | null>(null);
@@ -874,6 +877,7 @@ export function PartidasClient({
         body: JSON.stringify({
           match_date: dataFinal,
           location: location.trim() || null,
+          title: title.trim() || "Fut Semanal",
         }),
       });
       if (!res.ok) {
@@ -1045,6 +1049,22 @@ export function PartidasClient({
                         placeholder="Ex: Quadra do Parque"
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
+                        disabled={carregandoConfig}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label
+                        htmlFor="title"
+                        className="flex items-center gap-1.5"
+                      >
+                        <Type className="size-3.5 text-muted-foreground" />
+                        Título
+                      </Label>
+                      <Input
+                        id="title"
+                        placeholder="Ex: Fut Semanal"
+                        onChange={(e) => setTitle(e.target.value)}
                         disabled={carregandoConfig}
                       />
                     </div>
@@ -1310,7 +1330,9 @@ export function PartidasClient({
                             Math.min(totalPaginasEncerradas - 1, p + 1),
                           )
                         }
-                        disabled={paginaEncerradas >= totalPaginasEncerradas - 1}
+                        disabled={
+                          paginaEncerradas >= totalPaginasEncerradas - 1
+                        }
                       >
                         Próxima
                         <ChevronRight className="size-3.5" />

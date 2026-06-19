@@ -451,7 +451,10 @@ export default function ElencoPage() {
                 >
                   {/* Coluna jogador: avatar + nome + subtítulo */}
                   <TableCell>
-                    <div className="flex items-center gap-3">
+                    <Link
+                      href={`/jogadores/${j.id}`}
+                      className="flex items-center gap-3 hover:opacity-80 transition-opacity w-fit"
+                    >
                       <PlayerAvatar
                         name={j.name}
                         src={j.photo_url ?? undefined}
@@ -466,13 +469,8 @@ export default function ElencoPage() {
                             {nicknameExibido(j)}
                           </p>
                         )}
-                        {/* {subtitulo(j) && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {subtitulo(j)}
-                          </p>
-                        )} */}
                       </div>
-                    </div>
+                    </Link>
                   </TableCell>
 
                   {/* Posição */}

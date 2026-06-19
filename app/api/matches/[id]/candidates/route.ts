@@ -18,9 +18,10 @@ export async function GET(
 
         const { id: matchId } = await params
 
-        // Busca quem já está na partida para excluir da listagem de candidatos
+        // Busca apenas jogadores confirmados para excluir da listagem de candidatos
+        // Jogadores que cancelaram (confirmed=false) podem ser re-adicionados
         const jogadoresPresentes = await prisma.match_players.findMany({
-            where: { match_id: matchId },
+            where: { match_id: matchId, confirmed: true },
             select: { user_id: true, guest_player_id: true },
         })
 

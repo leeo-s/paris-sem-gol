@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { match_date, location } = body;
+    const { match_date, location, title } = body;
 
     if (!match_date) {
       return NextResponse.json(
@@ -133,13 +133,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const dataPartida = new Date(match_date);
+    const mesPartida = dataPartida.getUTCMonth() + 1;
+    const anoPartida = dataPartida.getUTCFullYear();
+
     const novaPartida = await prisma.matches.create({
       data: {
-        match_date: new Date(match_date),
+        match_date: dataPartida,
         location,
+        title,
         created_by: user.id,
       },
     });
+
+    // Busca mensalistas ativos do mês da partida para confirmação automática
+    const mensalistas = await prisma.monthly_roster.findMany({
+      where: { month: mesPartida, year: anoPartida, status: "active" },
+      select: { user_id: true },
+    });
+
+    // Busca todos os goleiros ativos do clube
+    const goleirosAtivos = await prisma.users.findMany({
+      where: { is_goalkeeper: true, is_active: true },
+      select: { id: true },
+    });
+
+    // Monta conjuntos de IDs para facilitar a verificação de sobreposição
+    const idsMensalistas = new Set(mensalistas.map((m) => m.user_id));
+    const idsGoleiros = new Set(goleirosAtivos.map((g) => g.id));
+
+    // Unifica mensalistas e goleiros em uma única lista sem duplicatas,
+    // marcando corretamente quem é goleiro
+    const todosIds = new Set([...idsMensalistas, ...idsGoleiros]);
+    const jogadoresParaInserir = Array.from(todosIds).map((userId) => ({
+      match_id: novaPartida.id,
+      user_id: userId,
+      confirmed: true,
+      is_goalkeeper: idsGoleiros.has(userId),
+    }));
+
+    if (jogadoresParaInserir.length > 0) {
+      await prisma.match_players.createMany({
+        data: jogadoresParaInserir,
+        skipDuplicates: true,
+      });
+    }
 
     return NextResponse.json(novaPartida, { status: 201 });
   } catch (error) {
