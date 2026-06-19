@@ -167,6 +167,7 @@ const TRANSACOES_POR_PAGINA = 10;
 const ATRIBUTOS: { label: string; key: keyof PlayerRatings }[] = [
   { label: "VEL", key: "speed" },
   { label: "DRI", key: "dribbling" },
+  { label: "PAS", key: "passing" },
   { label: "CHU", key: "finishing" },
   { label: "DEF", key: "defense" },
   { label: "FIS", key: "physical" },
@@ -505,7 +506,9 @@ function CardEstatistica({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-4", className)}>
+    <div
+      className={cn("rounded-xl border border-border bg-card p-4", className)}
+    >
       <div className="flex items-center gap-2 mb-3">
         <Icone className={cn("size-4", corIcone)} />
         <p className="text-sm font-semibold text-foreground">{titulo}</p>
@@ -1226,7 +1229,7 @@ export default function PerfilJogadorPage() {
       <div className="md:hidden rounded-2xl bg-sidebar p-4">
         <div className="flex items-center gap-4">
           {/* Avatar */}
-          <div className="size-20 rounded-full border-2 border-gold flex items-center justify-center overflow-hidden bg-sidebar-accent shrink-0">
+          <div className="size-20 rounded-full border-2 border-gold flex items-center justify-center overflow-hidden bg-sidebar-accent shrink-0 ">
             {jogador.photo_url ? (
               <img
                 src={jogador.photo_url}
@@ -1248,11 +1251,36 @@ export default function PerfilJogadorPage() {
             <p className="text-sm text-sidebar-foreground/60">{posicaoLabel}</p>
           </div>
 
-          {/* Overall badge */}
-          <div className="size-12 rounded-full border-2 border-gold bg-sidebar-accent flex items-center justify-center shrink-0">
-            <span className="font-heading text-lg text-gold leading-none">
-              {overallDisplay}
-            </span>
+          {/* Overall + atributos técnicos */}
+          <div className="shrink-0 flex flex-col items-center gap-2">
+            <div className="size-12 rounded-full border-2 border-gold bg-sidebar-accent flex items-center justify-center">
+              <span className="font-heading text-lg text-gold leading-none">
+                {overallDisplay}
+              </span>
+            </div>
+
+            {ratings && (
+              <div className="flex items-end gap-2">
+                {ATRIBUTOS.map(({ label, key }) => {
+                  const val = ratings[key] as number | null;
+                  return (
+                    <div key={label} className="text-center">
+                      <p className="text-[10px] font-medium text-sidebar-foreground/40 mb-0.5">
+                        {label}
+                      </p>
+                      <p
+                        className={cn(
+                          "font-heading text-sm leading-none",
+                          corAtributo(val),
+                        )}
+                      >
+                        {val !== null ? Math.round(val) : "—"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1336,13 +1364,13 @@ export default function PerfilJogadorPage() {
       {/* ── Abas ────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Navegação das abas */}
-        <div className="flex border-b border-border">
+        <div className="flex border-b border-border overflow-x-auto scrollbar-none">
           {abas.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setAba(key)}
               className={cn(
-                "px-5 py-3 text-sm font-medium transition-colors relative",
+                "shrink-0 whitespace-nowrap px-5 py-3 text-sm font-medium transition-colors relative",
                 aba === key
                   ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-foreground"
                   : "text-muted-foreground hover:text-foreground",
