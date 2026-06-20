@@ -24,9 +24,15 @@ type ProximaPartida = {
 };
 
 // Exibe o card da próxima partida com botão de confirmar/cancelar presença
-export function ProximaPartidaCard({ match }: { match: ProximaPartida | null }) {
+export function ProximaPartidaCard({
+  match,
+}: {
+  match: ProximaPartida | null;
+}) {
   const router = useRouter();
-  const [confirmado, setConfirmado] = useState(match?.usuarioJaConfirmou ?? false);
+  const [confirmado, setConfirmado] = useState(
+    match?.usuarioJaConfirmou ?? false,
+  );
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -108,7 +114,7 @@ export function ProximaPartidaCard({ match }: { match: ProximaPartida | null }) 
       <CardContent className="p-4 md:p-5">
         <div className="flex items-center gap-4">
           {/* Caixa com a data da partida */}
-          <div className="flex flex-col items-center justify-center rounded-xl bg-sidebar-accent px-4 py-2.5 shrink-0 min-w-[60px] text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl bg-sidebar-accent px-4 py-2.5 shrink-0 min-w-15 text-center">
             <span className="font-heading text-3xl leading-none text-primary-foreground">
               {dia}
             </span>
@@ -141,10 +147,15 @@ export function ProximaPartidaCard({ match }: { match: ProximaPartida | null }) 
               size="sm"
               variant="outline"
               className={classesBotao}
-              onClick={(e) => { impedirPropagacao(e); alternarPresenca(); }}
+              onClick={(e) => {
+                impedirPropagacao(e);
+                alternarPresenca();
+              }}
               disabled={carregando}
             >
-              <IconeBotao className={`size-3.5 ${carregando ? "animate-spin" : ""}`} />
+              <IconeBotao
+                className={`size-3.5 ${carregando ? "animate-spin" : ""}`}
+              />
               {textoBotao}
             </Button>
           )}
@@ -156,10 +167,15 @@ export function ProximaPartidaCard({ match }: { match: ProximaPartida | null }) 
             size="sm"
             variant="outline"
             className={classesBotaoMobile}
-            onClick={(e) => { impedirPropagacao(e); alternarPresenca(); }}
+            onClick={(e) => {
+              impedirPropagacao(e);
+              alternarPresenca();
+            }}
             disabled={carregando}
           >
-            <IconeBotao className={`size-3.5 ${carregando ? "animate-spin" : ""}`} />
+            <IconeBotao
+              className={`size-3.5 ${carregando ? "animate-spin" : ""}`}
+            />
             {textoBotao}
           </Button>
         )}

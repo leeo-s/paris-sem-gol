@@ -318,7 +318,7 @@ function ArtilheirosCard({
                       className="mt-1.5"
                     />
                   </div>
-                  <span className="font-heading text-base text-foreground shrink-0 min-w-[20px] text-right leading-none">
+                  <span className="font-heading text-base text-foreground shrink-0 min-w-5 text-right leading-none">
                     {item.gols}
                   </span>
                 </div>

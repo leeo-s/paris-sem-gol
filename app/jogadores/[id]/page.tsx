@@ -710,7 +710,7 @@ function AbaPartidas({
               {/* Linha principal: data + status + local + estatísticas */}
               <div className="flex items-start gap-3">
                 {/* Caixa com a data */}
-                <div className="flex flex-col items-center justify-center rounded-xl bg-muted px-3 py-2 shrink-0 min-w-[52px] text-center">
+                <div className="flex flex-col items-center justify-center rounded-xl bg-muted px-3 py-2 shrink-0 min-w-13 text-center">
                   <span className="font-heading text-2xl leading-none text-foreground">
                     {dia}
                   </span>
