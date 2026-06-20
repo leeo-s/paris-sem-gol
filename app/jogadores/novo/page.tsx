@@ -147,14 +147,14 @@ export default function NovoJogadorPage() {
     setForm((f) => ({ ...f, [campo]: valor }));
     setOverall(
       Math.floor(
-        (campo === "velocidade"
-          ? (valor as number)
-          : form.velocidade +
-            (campo === "passe" ? (valor as number) : form.passe) +
-            (campo === "drible" ? (valor as number) : form.drible) +
-            (campo === "finalizacao" ? (valor as number) : form.finalizacao) +
-            (campo === "defesa" ? (valor as number) : form.defesa) +
-            (campo === "fisico" ? (valor as number) : form.fisico)) / 6,
+        (
+          (campo === "velocidade" ? (valor as number) : form.velocidade) +
+          (campo === "passe" ? (valor as number) : form.passe) +
+          (campo === "drible" ? (valor as number) : form.drible) +
+          (campo === "finalizacao" ? (valor as number) : form.finalizacao) +
+          (campo === "defesa" ? (valor as number) : form.defesa) +
+          (campo === "fisico" ? (valor as number) : form.fisico)
+        ) / 6,
       ),
     );
   }
