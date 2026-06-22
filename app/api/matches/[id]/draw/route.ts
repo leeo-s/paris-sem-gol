@@ -144,7 +144,89 @@ export async function GET(
     }
 }
 
+// Seleção de colunas reutilizada nas consultas de jogadores confirmados
+const INCLUDE_JOGADORES = {
+    users: {
+        select: {
+            id: true,
+            name: true,
+            nickname: true,
+            photo_url: true,
+            position: true,
+            is_goalkeeper: true,
+            player_ratings: { select: { overall: true } },
+        },
+    },
+    guest_players: { select: { id: true, name: true, position: true } },
+} as const
+
+// Converte um match_player do Prisma para o tipo JogadorParaSorteio
+function mapearMatchPlayer(mp: {
+    id: string
+    user_id: string | null
+    guest_player_id: string | null
+    is_goalkeeper: boolean
+    users?: {
+        name: string
+        nickname: string | null
+        photo_url: string | null
+        position: string | null
+        is_goalkeeper: boolean
+        // overall pode ser null no schema Prisma; o ?? 5 garante um fallback numérico
+        player_ratings: { overall: number | null } | null
+    } | null
+    guest_players?: { name: string; position: string | null } | null
+}): JogadorParaSorteio {
+    return {
+        matchPlayerId: mp.id,
+        userId: mp.user_id,
+        guestPlayerId: mp.guest_player_id,
+        nome: mp.users?.name ?? mp.guest_players?.name ?? 'Desconhecido',
+        apelido: mp.users?.nickname ?? null,
+        fotoUrl: mp.users?.photo_url ?? null,
+        posicao: mp.users?.position ?? mp.guest_players?.position ?? null,
+        overall: mp.users?.player_ratings?.overall ?? 5,
+        ehGoleiro: mp.is_goalkeeper || (mp.users?.is_goalkeeper ?? false),
+    }
+}
+
+// Calcula o overall médio de jogadores de campo e monta o objeto de retorno de um time
+function montarEstatisticasTime(
+    jogadores: JogadorParaSorteio[],
+    indice: number,
+    nome: string,
+    teamId: string,
+) {
+    const jogadoresDeLinha = jogadores.filter(j => !j.ehGoleiro)
+    const somaOverall = jogadoresDeLinha.reduce((soma, j) => soma + j.overall, 0)
+    const overallMedio = jogadoresDeLinha.length > 0 ? somaOverall / jogadoresDeLinha.length : 0
+    return {
+        nome,
+        indice,
+        overallMedio: Math.round(overallMedio * 10) / 10,
+        jogadores,
+        teamId,
+    }
+}
+
+// Cria os registros de match_teams no banco, apagando os anteriores
+async function recriarTimesNoBanco(matchId: string, nomesDosTime: string[]) {
+    return prisma.$transaction(async (tx) => {
+        await tx.match_teams.deleteMany({ where: { match_id: matchId } })
+
+        const criados: { id: string; indice: number }[] = []
+        for (let i = 0; i < nomesDosTime.length; i++) {
+            const time = await tx.match_teams.create({
+                data: { match_id: matchId, team_name: nomesDosTime[i], team_index: i },
+            })
+            criados.push({ id: time.id, indice: i })
+        }
+        return criados
+    })
+}
+
 // POST /api/matches/:id/draw — sorteia times equilibrados por overall e salva no banco
+// Aceita manual_assignments para pular o sorteio e usar uma distribuição definida pelo usuário
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -165,6 +247,14 @@ export async function POST(
         const { id: matchId } = await params
         const body = await request.json()
 
+        // Quando o usuário escolheu os times manualmente, pula o algoritmo de sorteio
+        if (Array.isArray(body.manual_assignments) && body.manual_assignments.length > 0) {
+            return await processarAtribuicaoManual(
+                matchId,
+                body.manual_assignments as { matchPlayerId: string; teamIndex: number }[],
+            )
+        }
+
         const jogadoresPorTime: number = body.players_per_team
 
         if (!jogadoresPorTime || jogadoresPorTime < 4 || jogadoresPorTime > 12) {
@@ -176,20 +266,7 @@ export async function POST(
 
         const jogadoresConfirmados = await prisma.match_players.findMany({
             where: { match_id: matchId, confirmed: true },
-            include: {
-                users: {
-                    select: {
-                        id: true,
-                        name: true,
-                        nickname: true,
-                        photo_url: true,
-                        position: true,
-                        is_goalkeeper: true,
-                        player_ratings: { select: { overall: true } },
-                    },
-                },
-                guest_players: { select: { id: true, name: true, position: true } },
-            },
+            include: INCLUDE_JOGADORES,
         })
 
         if (jogadoresConfirmados.length === 0) {
@@ -206,17 +283,7 @@ export async function POST(
             }, { status: 422 })
         }
 
-        const jogadoresParaSorteio: JogadorParaSorteio[] = jogadoresConfirmados.map(mp => ({
-            matchPlayerId: mp.id,
-            userId: mp.user_id,
-            guestPlayerId: mp.guest_player_id,
-            nome: mp.users?.name ?? mp.guest_players?.name ?? 'Desconhecido',
-            apelido: mp.users?.nickname ?? null,
-            fotoUrl: mp.users?.photo_url ?? null,
-            posicao: mp.users?.position ?? mp.guest_players?.position ?? null,
-            overall: mp.users?.player_ratings?.overall ?? 5,
-            ehGoleiro: mp.is_goalkeeper || (mp.users?.is_goalkeeper ?? false),
-        }))
+        const jogadoresParaSorteio = jogadoresConfirmados.map(mapearMatchPlayer)
 
         const timesDistribuidos = distribuirJogadoresEmTimes(jogadoresParaSorteio, jogadoresPorTime)
         const quantidadeDeTimes = timesDistribuidos.length
@@ -224,34 +291,11 @@ export async function POST(
         const nomesDosTime: string[] = body.team_names ??
             Array.from({ length: quantidadeDeTimes }, (_, i) => `Time ${LETRAS_TIME[i] ?? String(i + 1)}`)
 
-        // Remove times anteriores e cria os novos — team_id nos jogadores só é salvo ao iniciar
-        const timesCreados = await prisma.$transaction(async (tx) => {
-            await tx.match_teams.deleteMany({ where: { match_id: matchId } })
+        const timesCreados = await recriarTimesNoBanco(matchId, nomesDosTime)
 
-            const criados: { id: string; indice: number }[] = []
-            for (let i = 0; i < quantidadeDeTimes; i++) {
-                const time = await tx.match_teams.create({
-                    data: { match_id: matchId, team_name: nomesDosTime[i], team_index: i },
-                })
-                criados.push({ id: time.id, indice: i })
-            }
-
-            return criados
-        })
-
-        const timesComEstatisticas = timesDistribuidos.map((jogadores, indice) => {
-            const jogadoresDeLinha = jogadores.filter(j => !j.ehGoleiro)
-            const somaOverall = jogadoresDeLinha.reduce((soma, j) => soma + j.overall, 0)
-            const overallMedio = jogadoresDeLinha.length > 0 ? somaOverall / jogadoresDeLinha.length : 0
-
-            return {
-                nome: nomesDosTime[indice],
-                indice,
-                overallMedio: Math.round(overallMedio * 10) / 10,
-                jogadores,
-                teamId: timesCreados[indice].id,
-            }
-        })
+        const timesComEstatisticas = timesDistribuidos.map((jogadores, indice) =>
+            montarEstatisticasTime(jogadores, indice, nomesDosTime[indice], timesCreados[indice].id)
+        )
 
         return NextResponse.json({ times: timesComEstatisticas })
     } catch (error) {
@@ -261,4 +305,50 @@ export async function POST(
         console.error('[POST /api/matches/:id/draw]', error)
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
     }
+}
+
+// Processa a distribuição manual: cria os times a partir das atribuições enviadas pelo cliente
+async function processarAtribuicaoManual(
+    matchId: string,
+    atribuicoes: { matchPlayerId: string; teamIndex: number }[],
+): Promise<NextResponse> {
+    const jogadoresConfirmados = await prisma.match_players.findMany({
+        where: { match_id: matchId, confirmed: true },
+        include: INCLUDE_JOGADORES,
+    })
+
+    const jogadorPorId = new Map(jogadoresConfirmados.map(mp => [mp.id, mp]))
+
+    // Determina quantos times existem a partir dos índices únicos enviados
+    const indicesUnicos = [...new Set(atribuicoes.map(a => a.teamIndex))].sort((a, b) => a - b)
+    const quantidadeDeTimes = indicesUnicos.length
+
+    // Mapeia o índice original para um índice sequencial (0, 1, 2...)
+    const mapaDeIndices = new Map(indicesUnicos.map((original, sequencial) => [original, sequencial]))
+
+    const nomesDosTime = Array.from(
+        { length: quantidadeDeTimes },
+        (_, i) => `Time ${LETRAS_TIME[i] ?? String(i + 1)}`,
+    )
+
+    const timesCreados = await recriarTimesNoBanco(matchId, nomesDosTime)
+
+    // Distribui cada jogador ao time correspondente
+    const timesDistribuidos: JogadorParaSorteio[][] = Array.from({ length: quantidadeDeTimes }, () => [])
+
+    for (const atribuicao of atribuicoes) {
+        const mp = jogadorPorId.get(atribuicao.matchPlayerId)
+        if (!mp) continue
+
+        const indiceSequencial = mapaDeIndices.get(atribuicao.teamIndex)
+        if (indiceSequencial === undefined) continue
+
+        timesDistribuidos[indiceSequencial].push(mapearMatchPlayer(mp))
+    }
+
+    const timesComEstatisticas = timesDistribuidos.map((jogadores, indice) =>
+        montarEstatisticasTime(jogadores, indice, nomesDosTime[indice], timesCreados[indice].id)
+    )
+
+    return NextResponse.json({ times: timesComEstatisticas })
 }
