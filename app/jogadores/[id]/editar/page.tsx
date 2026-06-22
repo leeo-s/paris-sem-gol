@@ -289,7 +289,7 @@ export default function EditarJogadorPage() {
     }));
   }
 
-  // Faz upload da foto e atualiza o estado com a URL retornada
+  // Faz upload da foto, salva imediatamente no banco e atualiza o estado
   async function handleFotoSelecionada(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
@@ -300,18 +300,31 @@ export default function EditarJogadorPage() {
       const formData = new FormData();
       formData.append("file", arquivo);
 
-      const res = await fetch("/api/upload", {
+      const resUpload = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
-      if (!res.ok) {
-        const data = await res.json();
+      if (!resUpload.ok) {
+        const data = await resUpload.json();
         setErro(data.error ?? "Erro ao fazer upload da foto.");
         return;
       }
 
-      const { url } = await res.json();
+      const { url } = await resUpload.json();
+
+      const resSave = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo_url: url }),
+      });
+
+      if (!resSave.ok) {
+        const data = await resSave.json();
+        setErro(data.error ?? "Erro ao salvar a foto de perfil.");
+        return;
+      }
+
       atualizar("photo_url", url);
     } catch {
       setErro("Falha no upload. Tente novamente.");
