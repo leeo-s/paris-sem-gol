@@ -624,8 +624,8 @@ export function SortearClient({ matchId }: { matchId: string }) {
             Sorteio de Times
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure o número de jogadores por time e sorteie ou monte os
-            times manualmente.
+            Configure o número de jogadores por time e sorteie ou monte os times
+            manualmente.
           </p>
         </div>
 
@@ -733,7 +733,8 @@ export function SortearClient({ matchId }: { matchId: string }) {
                 {/* Linha com cada time, cor, contagem de jogadores e overall calculado */}
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
                   {Array.from({ length: numeroDeTimes }, (_, i) => {
-                    const quantidadeNoCampo = contagemDeCampoPorTime.get(i) ?? 0;
+                    const quantidadeNoCampo =
+                      contagemDeCampoPorTime.get(i) ?? 0;
                     const cheio = timesCheios.has(i);
                     return (
                       <div key={i} className="flex items-center gap-2">
@@ -800,10 +801,7 @@ export function SortearClient({ matchId }: { matchId: string }) {
                           }
                           timesCheios={timesCheios}
                           aoAtribuir={(indice) =>
-                            atribuirJogadorAoTime(
-                              jogador.matchPlayerId,
-                              indice,
-                            )
+                            atribuirJogadorAoTime(jogador.matchPlayerId, indice)
                           }
                         />
                       ))}
@@ -891,7 +889,7 @@ export function SortearClient({ matchId }: { matchId: string }) {
                 className="gap-2 bg-white"
               >
                 <Pencil className="size-4" />
-                Refazer Atribuição
+                Refazer Times
               </Button>
             ) : (
               // No modo sorteio: ressorteia com a mesma configuração
