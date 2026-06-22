@@ -107,8 +107,7 @@ function maskPhone(value: string): string {
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length === 3) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 7)
-    return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3)}`;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3, 7)}-${d.slice(7)}`;
 }
 
@@ -226,10 +225,9 @@ export default function EditarJogadorPage() {
       if (dadosJogador?.id) {
         const ratings = dadosJogador.player_ratings;
         // Converte posição armazenada ("Atacante") de volta para o código ("ATA")
-        const posCode =
-          dadosJogador.is_goalkeeper
-            ? "GK"
-            : POSICAO_POR_LABEL[dadosJogador.position ?? ""] ?? null;
+        const posCode = dadosJogador.is_goalkeeper
+          ? "GK"
+          : (POSICAO_POR_LABEL[dadosJogador.position ?? ""] ?? null);
 
         // Formata telefone para exibição
         const phoneMasked = dadosJogador.phone
@@ -270,7 +268,8 @@ export default function EditarJogadorPage() {
 
   useEffect(() => {
     if (carregando) return;
-    const ehGestorLocal = sessao?.role === "admin" || sessao?.role === "co_admin";
+    const ehGestorLocal =
+      sessao?.role === "admin" || sessao?.role === "co_admin";
     const ehProprioJogadorLocal = sessao?.id === id;
     if (!ehProprioJogadorLocal && !ehGestorLocal) {
       router.replace(`/jogadores/${id}`);
@@ -291,9 +290,7 @@ export default function EditarJogadorPage() {
   }
 
   // Faz upload da foto e atualiza o estado com a URL retornada
-  async function handleFotoSelecionada(
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) {
+  async function handleFotoSelecionada(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
 
@@ -337,14 +334,15 @@ export default function EditarJogadorPage() {
     if (!form.position) {
       setErro("Selecione a posição do jogador antes de salvar.");
       // Rola até a seção de posição para facilitar a correção
-      document.getElementById("secao-posicao")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document
+        .getElementById("secao-posicao")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     setSalvando(true);
     try {
-      const ehGestor =
-        sessao?.role === "admin" || sessao?.role === "co_admin";
+      const ehGestor = sessao?.role === "admin" || sessao?.role === "co_admin";
 
       const posicaoSublabel = POSICOES.find(
         (p) => p.valor === form.position,
@@ -679,7 +677,9 @@ export default function EditarJogadorPage() {
                 <span
                   className={cn(
                     "text-[10px] hidden sm:block",
-                    selecionado ? "text-background/70" : "text-muted-foreground",
+                    selecionado
+                      ? "text-background/70"
+                      : "text-muted-foreground",
                   )}
                 >
                   {sublabel}
@@ -703,7 +703,7 @@ export default function EditarJogadorPage() {
           {gkSelecionado && (
             <div className="flex items-start gap-2 rounded-lg bg-info/10 border border-info/30 px-4 py-3 text-sm text-info-foreground">
               <Info className="size-4 shrink-0 mt-0.5 text-info" />
-              <span>
+              <span className="text-black">
                 Para goleiros, os atributos Defesa e Físico são os mais
                 relevantes.
               </span>

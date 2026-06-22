@@ -391,7 +391,7 @@ function CartaoAberta({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="font-heading text-base tracking-wide text-foreground">
-                Pelada Semanal
+                {partida.title ?? "Pelada Semanal"}
               </p>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-muted-foreground w-50">
                 <span>{dataCurta + " - " + formatarHorario(partida.time)}</span>
@@ -785,6 +785,7 @@ export function PartidasClient({
   const [matchDateEdicao, setMatchDateEdicao] = useState("");
   const [locationEdicao, setLocationEdicao] = useState("");
   const [horarioEdicao, setHorarioEdicao] = useState("");
+  const [tituloEdicao, setTituloEdicao] = useState("");
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
 
@@ -794,6 +795,7 @@ export function PartidasClient({
     setMatchDateEdicao(toInputDate(partida.match_date));
     setLocationEdicao(partida.location ?? "");
     setHorarioEdicao(partida.time ? formatarHorario(partida.time) : "");
+    setTituloEdicao(partida.title ?? "");
     setErroEdicao(null);
     setSalvandoEdicao(false);
   }
@@ -816,6 +818,7 @@ export function PartidasClient({
         body: JSON.stringify({
           match_date: dataFinal,
           location: locationEdicao.trim() || null,
+          title: tituloEdicao.trim() || null,
         }),
       });
       if (!resposta.ok) {
@@ -1150,6 +1153,22 @@ export function PartidasClient({
                   placeholder="Ex: Quadra do Parque"
                   value={locationEdicao}
                   onChange={(e) => setLocationEdicao(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label
+                  htmlFor="title_edicao"
+                  className="flex items-center gap-1.5"
+                >
+                  <MapPin className="size-3.5 text-muted-foreground" />
+                  Título
+                </Label>
+                <Input
+                  id="title_edicao"
+                  placeholder="Ex: Quadra do Parque"
+                  value={tituloEdicao}
+                  onChange={(e) => setTituloEdicao(e.target.value)}
                 />
               </div>
             </div>

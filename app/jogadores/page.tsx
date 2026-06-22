@@ -29,8 +29,22 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Users,
+  Plus,
+  Minus,
+  Trash2,
+  Pencil,
+  X,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 // ─── tipos ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +79,47 @@ type SessaoUsuario = {
 } | null;
 
 type FiltroTab = "todos" | "ativos" | "inadimplente" | "gk" | "suspensos";
+
+// Dados de um jogador avulso/genérico (guest_player) retornado pela API
+type JogadorAvulso = {
+  id: string;
+  name: string;
+  phone: string | null;
+  position: string | null;
+  is_goalkeeper: boolean;
+  overall: number;
+  linked_user_id: string | null;
+  created_at: string;
+};
+
+// Posições disponíveis para o seletor de posição do avulso
+type PosicaoAvulso = "GK" | "DEF" | "MEI" | "ATA";
+
+const POSICOES_AVULSO: {
+  valor: PosicaoAvulso;
+  label: string;
+  sublabel: string;
+}[] = [
+  { valor: "GK", label: "GK", sublabel: "Goleiro" },
+  { valor: "DEF", label: "DEF", sublabel: "Defensor" },
+  { valor: "MEI", label: "MEI", sublabel: "Meia" },
+  { valor: "ATA", label: "ATA", sublabel: "Atacante" },
+];
+
+// Estado do formulário de criação/edição de jogador avulso
+type FormularioAvulso = {
+  name: string;
+  phone: string;
+  posicao: PosicaoAvulso | null;
+  overall: number;
+};
+
+const FORMULARIO_AVULSO_VAZIO: FormularioAvulso = {
+  name: "",
+  phone: "",
+  posicao: null,
+  overall: 5,
+};
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -230,6 +285,437 @@ function Paginacao({
   );
 }
 
+// ─── modal de jogadores genéricos ────────────────────────────────────────────
+
+// Gera as iniciais a partir do nome completo (até 2 palavras)
+function gerarIniciais(nomeCompleto: string): string {
+  return nomeCompleto
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((palavra) => palavra[0])
+    .join("")
+    .toUpperCase();
+}
+
+// Aplica máscara de telefone no formato (11) 9 1111-4444
+function aplicarMascaraTelefone(valor: string): string {
+  const digitos = valor.replace(/\D/g, "").slice(0, 11);
+  if (digitos.length === 0) return "";
+  if (digitos.length <= 2) return `(${digitos}`;
+  if (digitos.length === 3)
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`;
+  if (digitos.length <= 7)
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 3)} ${digitos.slice(3)}`;
+  return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 3)} ${digitos.slice(3, 7)}-${digitos.slice(7)}`;
+}
+
+// Stepper numérico com botões de incremento e decremento
+function NumericStepperAvulso({
+  valor,
+  aoMudar,
+  min = 1,
+  max = 10,
+}: {
+  valor: number;
+  aoMudar: (v: number) => void;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <div className="flex flex-col items-center border border-border rounded-xl overflow-hidden w-full">
+      <button
+        type="button"
+        onClick={() => aoMudar(Math.min(max, valor + 1))}
+        className="w-full flex items-center justify-center py-1.5 hover:bg-muted transition-colors text-muted-foreground"
+        aria-label="Aumentar"
+      >
+        <Plus className="size-3" />
+      </button>
+      <div className="py-2.5 font-heading text-xl text-foreground border-y border-border w-full text-center select-none">
+        {valor}
+      </div>
+      <button
+        type="button"
+        onClick={() => aoMudar(Math.max(min, valor - 1))}
+        className="w-full flex items-center justify-center py-1.5 hover:bg-muted transition-colors text-muted-foreground"
+        aria-label="Diminuir"
+      >
+        <Minus className="size-3" />
+      </button>
+    </div>
+  );
+}
+
+// Modal de listagem, criação e edição de jogadores genéricos (guest_players)
+function ModalJogadoresGenericos({
+  aberto,
+  onFechar,
+}: {
+  aberto: boolean;
+  onFechar: () => void;
+}) {
+  const [listaAvulsos, setListaAvulsos] = useState<JogadorAvulso[]>([]);
+  const [carregandoLista, setCarregandoLista] = useState(false);
+  // "lista" exibe todos os avulsos; "form" exibe o formulário de criação/edição
+  const [modoExibicao, setModoExibicao] = useState<"lista" | "form">("lista");
+  const [idEditando, setIdEditando] = useState<string | null>(null);
+  const [formulario, setFormulario] = useState<FormularioAvulso>(
+    FORMULARIO_AVULSO_VAZIO,
+  );
+  const [salvando, setSalvando] = useState(false);
+  const [idDeletando, setIdDeletando] = useState<string | null>(null);
+  const [mensagemErro, setMensagemErro] = useState<string | null>(null);
+
+  // Busca todos os jogadores avulsos cadastrados na API
+  const carregarAvulsos = useCallback(async () => {
+    setCarregandoLista(true);
+    try {
+      const resposta = await fetch("/api/guest-players");
+      if (resposta.ok) setListaAvulsos(await resposta.json());
+    } finally {
+      setCarregandoLista(false);
+    }
+  }, []);
+
+  // Recarrega a lista e volta ao modo lista sempre que o modal abre
+  useEffect(() => {
+    if (aberto) {
+      carregarAvulsos();
+      setModoExibicao("lista");
+      setMensagemErro(null);
+    }
+  }, [aberto, carregarAvulsos]);
+
+  // Abre o formulário em branco para criação de novo avulso
+  function abrirFormularioNovo() {
+    setFormulario(FORMULARIO_AVULSO_VAZIO);
+    setIdEditando(null);
+    setMensagemErro(null);
+    setModoExibicao("form");
+  }
+
+  // Preenche o formulário com os dados do avulso selecionado para edição
+  function abrirFormularioEdicao(avulso: JogadorAvulso) {
+    // Determina a posição selecionada: GK se goleiro, ou a abreviação da posição
+    const posicaoAtual: PosicaoAvulso | null = avulso.is_goalkeeper
+      ? "GK"
+      : ((avulso.position as PosicaoAvulso) ?? null);
+
+    setFormulario({
+      name: avulso.name,
+      // Aplica a máscara ao carregar, pois o banco armazena apenas os dígitos
+      phone: avulso.phone ? aplicarMascaraTelefone(avulso.phone) : "",
+      posicao: posicaoAtual,
+      overall: avulso.overall,
+    });
+    setIdEditando(avulso.id);
+    setMensagemErro(null);
+    setModoExibicao("form");
+  }
+
+  // Volta para a lista sem salvar
+  function voltarParaLista() {
+    setModoExibicao("lista");
+    setMensagemErro(null);
+  }
+
+  // Salva o avulso via POST (novo) ou PATCH (edição) e retorna à lista
+  async function salvarAvulso() {
+    if (!formulario.name.trim()) {
+      setMensagemErro("Nome é obrigatório.");
+      return;
+    }
+    setSalvando(true);
+    setMensagemErro(null);
+    try {
+      const ehGoleiro = formulario.posicao === "GK";
+      const dadosParaEnvio = {
+        name: formulario.name.trim(),
+        // Remove a máscara antes de enviar — o banco armazena apenas dígitos
+        phone: formulario.phone.replace(/\D/g, "") || null,
+        position: ehGoleiro ? null : (formulario.posicao ?? null),
+        is_goalkeeper: ehGoleiro,
+        overall: formulario.overall,
+      };
+
+      const url = idEditando
+        ? `/api/guest-players/${idEditando}`
+        : "/api/guest-players";
+
+      const resposta = await fetch(url, {
+        method: idEditando ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dadosParaEnvio),
+      });
+
+      if (!resposta.ok) {
+        const corpo = await resposta.json().catch(() => ({}));
+        setMensagemErro(
+          (corpo as { error?: string }).error ?? "Erro ao salvar.",
+        );
+        return;
+      }
+
+      await carregarAvulsos();
+      voltarParaLista();
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // Remove permanentemente o avulso após confirmação do usuário
+  async function deletarAvulso(id: string) {
+    if (!confirm("Tem certeza que deseja remover este jogador genérico?"))
+      return;
+    setIdDeletando(id);
+    try {
+      await fetch(`/api/guest-players/${id}`, { method: "DELETE" });
+      setListaAvulsos((anterior) => anterior.filter((a) => a.id !== id));
+    } finally {
+      setIdDeletando(null);
+    }
+  }
+
+  return (
+    <Dialog
+      open={aberto}
+      onOpenChange={(estaAberto) => {
+        if (!estaAberto) onFechar();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-lg max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden"
+      >
+        {/* Cabeçalho com navegação e botão fechar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            {modoExibicao === "form" && (
+              <button
+                onClick={voltarParaLista}
+                className="text-muted-foreground hover:text-foreground transition-colors -ml-0.5"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+            )}
+            <DialogTitle>
+              {modoExibicao === "lista"
+                ? "Jogadores Genéricos"
+                : idEditando
+                  ? "Editar Jogador"
+                  : "Novo Jogador"}
+            </DialogTitle>
+          </div>
+          <DialogClose className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-sm">
+            <X className="size-4" />
+          </DialogClose>
+        </div>
+
+        {modoExibicao === "lista" ? (
+          <>
+            {/* Lista scrollável de avulsos cadastrados */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {carregandoLista ? (
+                // Skeletons de carregamento
+                <div className="p-4 space-y-2">
+                  {[...Array(4)].map((_, indice) => (
+                    <div
+                      key={indice}
+                      className="h-14 rounded-lg bg-muted animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : listaAvulsos.length === 0 ? (
+                // Estado vazio
+                <div className="flex flex-col items-center justify-center py-14 gap-2 text-muted-foreground">
+                  <Users className="size-8 opacity-30" />
+                  <p className="text-sm">Nenhum jogador genérico cadastrado.</p>
+                </div>
+              ) : (
+                // Linha de cada avulso com ações de editar e remover
+                <div className="divide-y divide-border">
+                  {listaAvulsos.map((avulso) => (
+                    <div
+                      key={avulso.id}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
+                      {/* Avatar com iniciais */}
+                      <div className="size-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {gerarIniciais(avulso.name)}
+                        </span>
+                      </div>
+
+                      {/* Nome e posição/overall */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {avulso.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {avulso.is_goalkeeper
+                            ? "Goleiro"
+                            : (avulso.position ?? "Sem posição")}
+                          {" · "}OVR {avulso.overall}
+                        </p>
+                      </div>
+
+                      {/* Botões de ação */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => abrirFormularioEdicao(avulso)}
+                          className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                        {/* <button
+                          onClick={() => deletarAvulso(avulso.id)}
+                          disabled={idDeletando === avulso.id}
+                          className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
+                          title="Remover"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button> */}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé com botão de adicionar novo avulso */}
+            <div className="shrink-0 flex justify-end px-4 py-3 border-t border-border bg-muted/30">
+              <Button size="sm" onClick={abrirFormularioNovo}>
+                <Plus className="size-3.5 mr-1.5" />
+                Novo Jogador
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Formulário scrollável de criação/edição */}
+            <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
+              {/* Campo: Nome */}
+              <div className="space-y-1.5">
+                <Label htmlFor="avulso-nome">Nome *</Label>
+                <Input
+                  id="avulso-nome"
+                  value={formulario.name}
+                  onChange={(e) =>
+                    setFormulario((f) => ({ ...f, name: e.target.value }))
+                  }
+                  placeholder="Nome do jogador"
+                  className="bg-white"
+                />
+              </div>
+
+              {/* Campo: Telefone com máscara (11) 9 1111-4444 */}
+              <div className="space-y-1.5">
+                <Label htmlFor="avulso-telefone">Telefone</Label>
+                <Input
+                  id="avulso-telefone"
+                  type="tel"
+                  value={formulario.phone}
+                  onChange={(e) =>
+                    setFormulario((f) => ({
+                      ...f,
+                      phone: aplicarMascaraTelefone(e.target.value),
+                    }))
+                  }
+                  placeholder="(11) 9 ____-____"
+                  className="bg-white"
+                />
+              </div>
+
+              {/* Seletor de posição: 4 botões idênticos à tela de novo jogador */}
+              <div className="space-y-1.5">
+                <Label>Posição</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {POSICOES_AVULSO.map(({ valor, label, sublabel }) => {
+                    const selecionado = formulario.posicao === valor;
+                    return (
+                      <button
+                        key={valor}
+                        type="button"
+                        onClick={() =>
+                          setFormulario((f) => ({ ...f, posicao: valor }))
+                        }
+                        className={cn(
+                          "flex flex-col items-center gap-0.5 rounded-xl border py-3 px-2 transition-colors",
+                          selecionado
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-background hover:bg-muted",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "text-sm font-bold",
+                            selecionado
+                              ? "text-background"
+                              : valor === "GK"
+                                ? "text-accent"
+                                : "text-foreground",
+                          )}
+                        >
+                          {label}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[10px]",
+                            selecionado
+                              ? "text-background/70"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {sublabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Overall com stepper numérico (escala 1–10) */}
+              <div className="space-y-1.5">
+                <Label>Overall</Label>
+                <p className="text-xs text-muted-foreground -mt-0.5">
+                  Escala de 1 a 10
+                </p>
+                <div className="flex items-center gap-4">
+                  <div className="w-24">
+                    <NumericStepperAvulso
+                      valor={formulario.overall}
+                      aoMudar={(v) =>
+                        setFormulario((f) => ({ ...f, overall: v }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mensagem de erro de validação ou da API */}
+              {mensagemErro && (
+                <p className="text-sm text-destructive">{mensagemErro}</p>
+              )}
+            </div>
+
+            {/* Rodapé com ações de cancelar e salvar */}
+            <div className="shrink-0 flex justify-end gap-2 px-4 py-3 border-t border-border bg-muted/30">
+              <Button variant="outline" size="sm" onClick={voltarParaLista}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={salvarAvulso} disabled={salvando}>
+                {salvando ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── página ───────────────────────────────────────────────────────────────────
 
 const TABS: { label: string; value: FiltroTab }[] = [
@@ -252,6 +738,8 @@ export default function ElencoPage() {
   const [contadorInadimplentes, setContadorInadimplentes] = useState(0);
   const [sessao, setSessao] = useState<SessaoUsuario>(null);
   const [suspendendo, setSuspendendo] = useState<string | null>(null);
+  // Controla a abertura do modal de jogadores genéricos
+  const [modalAvulsosAberto, setModalAvulsosAberto] = useState(false);
 
   // Debounce da busca — evita chamadas a cada tecla
   useEffect(() => {
@@ -332,8 +820,6 @@ export default function ElencoPage() {
 
   const nomeExibido = (j: Jogador) => j.name;
   const nicknameExibido = (j: Jogador) => (j.nickname ? j.nickname : "");
-  const subtitulo = (j: Jogador) =>
-    j.is_goalkeeper ? "Goleiro titular" : (j.phone ?? "");
 
   const ehAdmin = sessao?.role === "admin" || sessao?.role === "co_admin";
 
@@ -396,15 +882,25 @@ export default function ElencoPage() {
           })}
         </div>
 
-        {/* Botão adicionar — posicionado após os filtros */}
+        {/* Botões de ação — posicionados após os filtros */}
         {ehAdmin && (
-          <Link
-            href="/jogadores/novo"
-            className={buttonVariants({ className: "ml-auto gap-2 shrink-0" })}
-          >
-            <UserPlus className="size-4" />
-            Adicionar Jogador
-          </Link>
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setModalAvulsosAberto(true)}
+              className="gap-2 bg-white"
+            >
+              <Users className="size-4" />
+              Jogadores Genéricos
+            </Button>
+            <Link
+              href="/jogadores/novo"
+              className={buttonVariants({ className: "gap-2" })}
+            >
+              <UserPlus className="size-4" />
+              Adicionar Jogador
+            </Link>
+          </div>
         )}
       </div>
 
@@ -560,6 +1056,12 @@ export default function ElencoPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de gerenciamento de jogadores genéricos */}
+      <ModalJogadoresGenericos
+        aberto={modalAvulsosAberto}
+        onFechar={() => setModalAvulsosAberto(false)}
+      />
     </div>
   );
 }

@@ -133,6 +133,7 @@ type Partida = {
   location: string | null;
   time: string | null;
   status: MatchStatus;
+  title: string | null;
   match_players: JogadorPartida[];
   goals: GoalEntry[];
   goals_conceded: GoalConcededEntry[];
@@ -505,7 +506,7 @@ function ViewIniciada({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-3">
             <p className="font-heading text-2xl md:text-3xl tracking-wide text-foreground">
-              Fut Semanal
+              {partida.title ?? "Fut Semanal"}
             </p>
             <BadgeStatus status={partida.status} />
           </div>
@@ -568,9 +569,7 @@ function ViewIniciada({
           <div
             className={cn(
               "grid gap-4",
-              times.length >= 2
-                ? "grid-cols-1 md:grid-cols-2"
-                : "grid-cols-1",
+              times.length >= 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1",
             )}
           >
             {times.map((time, indice) => (
@@ -622,7 +621,7 @@ function ViewAgendada({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
               <p className="font-heading text-2xl md:text-3xl tracking-wide text-foreground">
-                Fut Semanal
+                {partida.title ?? "Fut Semanal"}
               </p>
               <BadgeStatus status={partida.status} />
             </div>
@@ -830,7 +829,7 @@ function ViewEncerrada({ partida }: { partida: Partida }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
               <p className="font-heading text-2xl md:text-3xl tracking-wide text-foreground">
-                Fut Semanal
+                {partida.title ?? "Fut Semanal"}
               </p>
               <BadgeStatus status={partida.status} />
             </div>
@@ -1090,6 +1089,7 @@ export function PartidaDetalhesClient({
   const [matchDateEdicao, setMatchDateEdicao] = useState("");
   const [locationEdicao, setLocationEdicao] = useState("");
   const [horarioEdicao, setHorarioEdicao] = useState("");
+  const [tituloEdicao, setTituloEdicao] = useState("");
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
 
@@ -1184,6 +1184,7 @@ export function PartidaDetalhesClient({
     setMatchDateEdicao(toInputDate(partida.match_date));
     setLocationEdicao(partida.location ?? "");
     setHorarioEdicao(extrairHorario(partida.time));
+    setTituloEdicao(partida.title ?? "");
     setErroEdicao(null);
     setSalvandoEdicao(false);
     setEditandoPartida(true);
@@ -1207,6 +1208,7 @@ export function PartidaDetalhesClient({
         body: JSON.stringify({
           match_date: dataFinal,
           location: locationEdicao.trim() || null,
+          title: tituloEdicao.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -1578,6 +1580,22 @@ export function PartidaDetalhesClient({
                 placeholder="Ex: Quadra do Parque"
                 value={locationEdicao}
                 onChange={(e) => setLocationEdicao(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label
+                htmlFor="title_edicao"
+                className="flex items-center gap-1.5"
+              >
+                <MapPin className="size-3.5 text-muted-foreground" />
+                Título
+              </Label>
+              <Input
+                id="title_edicao"
+                placeholder="Ex: Fut Semanal"
+                value={tituloEdicao}
+                onChange={(e) => setTituloEdicao(e.target.value)}
               />
             </div>
           </div>

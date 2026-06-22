@@ -68,17 +68,29 @@ export async function PATCH(
         }
 
         const body = await request.json()
-        const { name, phone, linked_user_id } = body
+        const { name, phone, linked_user_id, position, is_goalkeeper, overall } = body
 
+        // Constrói o objeto de atualização apenas com os campos enviados
         const dadosParaAtualizar: Record<string, unknown> = {}
         if (name !== undefined) dadosParaAtualizar.name = name
         if (phone !== undefined) dadosParaAtualizar.phone = phone
         if (linked_user_id !== undefined) dadosParaAtualizar.linked_user_id = linked_user_id
+        if (position !== undefined) dadosParaAtualizar.position = position
+        if (is_goalkeeper !== undefined) dadosParaAtualizar.is_goalkeeper = is_goalkeeper
+        if (overall !== undefined) dadosParaAtualizar.overall = overall
 
         const avulsoAtualizado = await prisma.guest_players.update({
             where: { id },
             data: dadosParaAtualizar,
-            select: { id: true, name: true, phone: true, linked_user_id: true },
+            select: {
+                id: true,
+                name: true,
+                phone: true,
+                position: true,
+                is_goalkeeper: true,
+                overall: true,
+                linked_user_id: true,
+            },
         })
 
         return NextResponse.json(avulsoAtualizado)

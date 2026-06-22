@@ -181,6 +181,10 @@ export default function NovoJogadorPage() {
       setErro("Email é obrigatório.");
       return;
     }
+    if (!form.position) {
+      setErro("Posição é obrigatória.");
+      return;
+    }
 
     setSalvando(true);
     try {
@@ -341,7 +345,7 @@ export default function NovoJogadorPage() {
       <section className="rounded-xl border border-border bg-card p-5 space-y-5">
         <div className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Posição
+            Posição <span className="text-destructive">*</span>
           </h2>
           <div className="grid grid-cols-4 gap-2">
             {POSICOES.map(({ valor, label, sublabel }) => {
