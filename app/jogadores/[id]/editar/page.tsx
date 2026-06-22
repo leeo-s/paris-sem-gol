@@ -364,17 +364,6 @@ export default function EditarJogadorPage() {
         payload.is_goalkeeper = form.is_goalkeeper;
         payload.role = form.role;
         payload.is_active = form.is_active;
-
-        // Envia avaliações para o endpoint de ratings se for gestor
-        payload.ratings = [
-          form.finalizacao,
-          form.passe,
-          form.drible,
-          form.defesa,
-          form.fisico,
-          form.velocidade,
-          calcularOverall(form),
-        ];
       }
 
       const res = await fetch(`/api/users/${id}`, {
@@ -387,6 +376,28 @@ export default function EditarJogadorPage() {
         const data = await res.json();
         setErro(data.error ?? "Erro ao salvar.");
         return;
+      }
+
+      // Salva avaliações separadamente via endpoint dedicado
+      if (ehGestor) {
+        const resRatings = await fetch(`/api/users/${id}/ratings`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            speed: form.velocidade,
+            passing: form.passe,
+            dribbling: form.drible,
+            finishing: form.finalizacao,
+            defense: form.defesa,
+            physical: form.fisico,
+          }),
+        });
+
+        if (!resRatings.ok) {
+          const data = await resRatings.json();
+          setErro(data.error ?? "Erro ao salvar avaliações.");
+          return;
+        }
       }
 
       setSucesso(true);

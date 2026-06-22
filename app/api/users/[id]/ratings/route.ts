@@ -56,10 +56,10 @@ export async function PATCH(
 
         const { id } = await params
         const body = await request.json()
-        const { speed, finishing, passing, dribbling, defense } = body
+        const { speed, finishing, passing, dribbling, defense, physical } = body
 
         // Valida que os atributos estão no intervalo permitido (1 a 10)
-        const atributos = { speed, finishing, passing, dribbling, defense }
+        const atributos = { speed, finishing, passing, dribbling, defense, physical }
         for (const [nome, valor] of Object.entries(atributos)) {
             if (valor !== undefined && (valor < 1 || valor > 10 || !Number.isInteger(valor))) {
                 return NextResponse.json(
@@ -76,6 +76,7 @@ export async function PATCH(
         if (passing !== undefined) dadosParaAtualizar.passing = passing
         if (dribbling !== undefined) dadosParaAtualizar.dribbling = dribbling
         if (defense !== undefined) dadosParaAtualizar.defense = defense
+        if (physical !== undefined) dadosParaAtualizar.physical = physical
 
         const ratingAtualizado = await prisma.player_ratings.update({
             where: { user_id: id },
