@@ -591,7 +591,8 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const headersList = await headers();
-  const host = headersList.get("host") ?? "localhost:3000";
+  const rawHost = headersList.get("host") ?? "localhost:3000";
+  const host = rawHost.replace(/^www\./, "");
   const proto = headersList.get("x-forwarded-proto") ?? "http";
 
   const res = await fetch(`${proto}://${host}/api/dashboard`, {
