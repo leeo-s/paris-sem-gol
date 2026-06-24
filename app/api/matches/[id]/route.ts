@@ -158,8 +158,9 @@ export async function PATCH(
         }
       }
 
-      // Ao concluir a partida, abre automaticamente a sessão de votação MVP por 24h
-      if (status === "completed") {
+      // Ao concluir a partida, abre sessão de votação MVP apenas para partidas avulsas
+      // Partidas de campeonato não têm MVP por partida — o MVP é eleito ao final do campeonato
+      if (status === "completed" && partida.tournament_stage_id === null) {
         // Verifica se já existe sessão para não criar duplicada (ressalvando ressortear)
         const sessaoExistente = await tx.mvp_voting_sessions.findUnique({
           where: { match_id: id },

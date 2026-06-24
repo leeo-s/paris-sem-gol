@@ -119,15 +119,24 @@ function ViewAdmin({
   matchDate,
   onEncerrar,
   encerrando,
+  podVotar = false,
+  onVotar,
+  enviandoVoto = false,
+  erroVoto = null,
 }: {
   dados: DadosVotacao;
   jogadores: JogadorElegivel[];
   matchDate: string;
   onEncerrar: () => void;
   encerrando: boolean;
+  podVotar?: boolean;
+  onVotar?: (votedUserId: string) => void;
+  enviandoVoto?: boolean;
+  erroVoto?: string | null;
 }) {
-  const { sessao, resultados } = dados;
+  const { sessao, resultados, jaVotou, votadoEm } = dados;
   const [tempoRestante, setTempoRestante] = useState(0);
+  const [selecionado, setSelecionado] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessao.is_closed) return;
@@ -321,6 +330,102 @@ function ViewAdmin({
               {liderando.posicao && ` · ${liderando.posicao}`}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Seção de votação do admin quando ele também é participante */}
+      {podVotar && (
+        <div className="border-t border-border pt-5 space-y-3 pb-24 md:pb-0">
+          <h2 className="font-heading text-base tracking-wide text-foreground uppercase">
+            Seu Voto
+          </h2>
+
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
+            <Info className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              {jaVotou ? (
+                <>
+                  Você votou em{" "}
+                  <span className="font-semibold text-foreground">
+                    {jogadores.find((j) => j.userId === votadoEm)?.nome ?? "..."}
+                  </span>
+                  {sessao.is_closed ? "." : ". Resultado visível após o encerramento."}
+                </>
+              ) : sessao.is_closed ? (
+                "A votação foi encerrada sem o seu voto."
+              ) : (
+                "Vote no jogador que mais se destacou. Você ainda não votou."
+              )}
+            </p>
+          </div>
+
+          {erroVoto && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {erroVoto}
+            </div>
+          )}
+
+          {!jaVotou && !sessao.is_closed && (
+            <>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                {jogadores.map((jogador) => {
+                  const ehSelecionado = selecionado === jogador.userId;
+                  return (
+                    <button
+                      key={jogador.userId}
+                      type="button"
+                      disabled={enviandoVoto}
+                      onClick={() =>
+                        setSelecionado((prev) =>
+                          prev === jogador.userId ? null : jogador.userId
+                        )
+                      }
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-all cursor-pointer active:scale-[0.98]",
+                        ehSelecionado
+                          ? "border-gold/40 bg-gold/8"
+                          : "border-border bg-card hover:bg-muted/30"
+                      )}
+                    >
+                      <AvatarJogador
+                        nome={jogador.nome}
+                        photoUrl={jogador.photoUrl}
+                        size="sm"
+                      />
+                      <p className="text-xs font-semibold text-foreground leading-tight truncate w-full">
+                        {jogador.nome}
+                      </p>
+                      <Star
+                        className={cn(
+                          "size-4 transition-all",
+                          ehSelecionado
+                            ? "fill-gold text-gold"
+                            : "text-muted-foreground/30"
+                        )}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selecionado && (
+                <div className="fixed bottom-16 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t border-border md:static md:bottom-auto md:bg-transparent md:backdrop-blur-none md:border-none md:p-0">
+                  <Button
+                    className="w-full gap-2 bg-gold hover:bg-gold/90 text-white font-semibold h-12"
+                    disabled={enviandoVoto}
+                    onClick={() => {
+                      if (selecionado && onVotar) onVotar(selecionado);
+                    }}
+                  >
+                    <Star className="size-4 fill-white" />
+                    {enviandoVoto
+                      ? "Confirmando..."
+                      : `Confirmar Voto — ${jogadores.find((j) => j.userId === selecionado)?.nome ?? ""}`}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -742,6 +847,7 @@ export function VotacaoClient({
   }
 
   if (ehAdmin) {
+    const ehParticipante = jogadores.some((j) => j.userId === userId);
     return (
       <ViewAdmin
         dados={dados}
@@ -749,6 +855,10 @@ export function VotacaoClient({
         matchDate={matchDate}
         onEncerrar={encerrarVotacao}
         encerrando={encerrando}
+        podVotar={ehParticipante}
+        onVotar={confirmarVoto}
+        enviandoVoto={enviandoVoto}
+        erroVoto={erroVoto}
       />
     );
   }

@@ -64,11 +64,13 @@ export async function PATCH(
 
         const { id } = await params
         const body = await request.json()
-        const { name, event_date, member_fee, guest_fee, description } = body
+        const { name, event_date, event_time, location, member_fee, guest_fee, description } = body
 
         const dadosParaAtualizar: Record<string, unknown> = {}
         if (name !== undefined) dadosParaAtualizar.name = name
         if (event_date !== undefined) dadosParaAtualizar.event_date = new Date(event_date)
+        if (event_time !== undefined) dadosParaAtualizar.event_time = event_time
+        if (location !== undefined) dadosParaAtualizar.location = location
         if (member_fee !== undefined) dadosParaAtualizar.member_fee = member_fee
         if (guest_fee !== undefined) dadosParaAtualizar.guest_fee = guest_fee
         if (description !== undefined) dadosParaAtualizar.description = description

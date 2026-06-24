@@ -27,60 +27,78 @@ export type ResultadoPaginado<T> = {
 // ─── ranking de destaques da temporada (pódio) ──────────────────────────────────
 
 // Monta o ranking completo (sem limite) de todos os participantes do ano, ordenado
-// pelos critérios do pódio: +premiações MVP, +votos MVP, +presenças, +gols.
-// Base: qualquer jogador que esteve em pelo menos uma partida concluída no ano.
+// pelos critérios do pódio: +vezes eleito MVP (mvp_awards) → +votos totais
+// (mvp_votes + tournament_mvp_votes, inclui votos de quem não venceu) →
+// +presenças (match_players) → +gols (goals).
 export async function buscarRankingDestaques(
   ano: number,
 ): Promise<ArtilheiroAno[]> {
   const inicioAno = new Date(Date.UTC(ano, 0, 1));
   const fimAno = new Date(Date.UTC(ano, 11, 31, 23, 59, 59, 999));
   const filtroPartidasAno = { match_date: { gte: inicioAno, lte: fimAno } };
+  // Filtro para votos de torneio — usa created_at pois tournament_mvp_votes
+  // não tem relação direta com match_date
+  const filtroVotosTorneioAno = { created_at: { gte: inicioAno, lte: fimAno } };
 
-  // Todos os jogadores que participaram de pelo menos uma partida concluída no ano
+  // Base: todos os jogadores com pelo menos uma partida comum concluída no ano
+  // (bracket_key: null exclui partidas de torneio)
   const gruposParticipacoes = await prisma.match_players.groupBy({
     by: ["user_id"],
     where: {
       user_id: { not: null },
-      matches: { status: "completed", ...filtroPartidasAno },
+      matches: { status: "completed", bracket_key: null, ...filtroPartidasAno },
     },
     _count: { match_id: true },
   });
 
-  // Para cada participante, busca em paralelo os dados de desempate
+  // Para cada participante, busca em paralelo os dados das quatro fontes
   const candidatos = await Promise.all(
     gruposParticipacoes.map(async (participacao) => {
       const candidatoId = participacao.user_id as string;
-      const [premiacoesMvp, votos, gols] = await Promise.all([
-        prisma.monthly_awards.count({
-          where: { mvp_user_id: candidatoId, year: ano },
-        }),
-        prisma.mvp_votes.count({
-          where: { voted_user_id: candidatoId, matches: filtroPartidasAno },
-        }),
-        prisma.goals.count({
-          where: {
-            scorer_user_id: candidatoId,
-            matches: { ...filtroPartidasAno, status: "completed" },
-          },
-        }),
-      ]);
+
+      const [vezesEleitoMvp, votosEmPartidas, votosEmTorneios, totalGols] =
+        await Promise.all([
+          // mvp_awards: fonte definitiva de quantas vezes o jogador foi eleito MVP
+          prisma.mvp_awards.count({
+            where: { user_id: candidatoId, year: ano },
+          }),
+          // mvp_votes: todos os votos recebidos em partidas no ano,
+          // incluindo partidas onde o jogador não venceu a eleição
+          prisma.mvp_votes.count({
+            where: { voted_user_id: candidatoId, matches: filtroPartidasAno },
+          }),
+          // tournament_mvp_votes: votos recebidos em torneios no ano
+          prisma.tournament_mvp_votes.count({
+            where: { voted_user_id: candidatoId, ...filtroVotosTorneioAno },
+          }),
+          // goals: gols marcados em partidas concluídas no ano
+          prisma.goals.count({
+            where: {
+              scorer_user_id: candidatoId,
+              matches: { ...filtroPartidasAno, status: "completed" },
+            },
+          }),
+        ]);
 
       return {
         id: candidatoId,
-        goals: gols,
-        premiacoesMvp,
-        votos,
-        participacoes: participacao._count.match_id,
+        goals: totalGols,
+        vezesEleito: vezesEleitoMvp,
+        // Soma votos de partidas e torneios para capturar jogadores que
+        // receberam muitos votos mesmo sem vencer a eleição
+        totalVotos: votosEmPartidas + votosEmTorneios,
+        // match_players já consultado na query base
+        presencas: participacao._count.match_id,
       };
     }),
   );
 
-  // Critérios em cascata: MVPs → votos → presenças → gols
+  // Critérios em cascata: vezes eleito MVP → total de votos → presenças → gols
   candidatos.sort(
     (a, b) =>
-      b.premiacoesMvp - a.premiacoesMvp ||
-      b.votos - a.votos ||
-      b.participacoes - a.participacoes ||
+      b.vezesEleito - a.vezesEleito ||
+      b.totalVotos - a.totalVotos ||
+      b.presencas - a.presencas ||
       b.goals - a.goals,
   );
 
@@ -97,9 +115,9 @@ export async function buscarRankingDestaques(
     .map((c) => ({
       ...mapaJogadores.get(c.id)!,
       goals: c.goals,
-      mvpAwards: c.premiacoesMvp,
-      votes: c.votos,
-      presences: c.participacoes,
+      mvpAwards: c.vezesEleito,
+      votes: c.totalVotos,
+      presences: c.presencas,
     }));
 }
 
@@ -126,21 +144,26 @@ export async function buscarRankingArtilheirosAno(
     orderBy: { _count: { scorer_user_id: "desc" } },
   });
 
+  const filtroVotosTorneioAno = { created_at: { gte: inicioAno, lte: fimAno } };
+
   // Para cada artilheiro, busca em paralelo os dados de desempate
   const candidatosComDesempate = await Promise.all(
     gruposGols.map(async (g) => {
       const candidatoId = g.scorer_user_id as string;
-      const [premiacoesMvp, votos, participacoes] = await Promise.all([
-        prisma.monthly_awards.count({
-          where: { mvp_user_id: candidatoId, year: ano },
+      const [premiacoesMvp, votosPartida, votosTorneio, participacoes] = await Promise.all([
+        prisma.mvp_awards.count({
+          where: { user_id: candidatoId, year: ano },
         }),
         prisma.mvp_votes.count({
           where: { voted_user_id: candidatoId, matches: filtroPartidasAno },
         }),
+        prisma.tournament_mvp_votes.count({
+          where: { voted_user_id: candidatoId, ...filtroVotosTorneioAno },
+        }),
         prisma.match_players.count({
           where: {
             user_id: candidatoId,
-            matches: { status: "completed", ...filtroPartidasAno },
+            matches: { status: "completed", bracket_key: null, ...filtroPartidasAno },
           },
         }),
       ]);
@@ -149,7 +172,7 @@ export async function buscarRankingArtilheirosAno(
         id: candidatoId,
         goals: g._count.scorer_user_id,
         premiacoesMvp,
-        votos,
+        votos: votosPartida + votosTorneio,
         participacoes,
       };
     }),

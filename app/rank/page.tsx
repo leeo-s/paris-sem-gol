@@ -8,6 +8,7 @@ import {
   Shield,
   CalendarCheck,
   Star,
+  Medal,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -35,6 +36,17 @@ type ItemPodio = JogadorResumido & {
 };
 type ItemMvp = JogadorResumido & { votes: number };
 type ItemArtilheiro = JogadorResumido & { goals: number };
+type ItemCampeonato = {
+  id: string;
+  name: string;
+  champion: string | null;
+  mvp: {
+    id: string;
+    name: string;
+    nickname: string | null;
+    photo_url: string | null;
+  } | null;
+};
 type ItemGoleiro = JogadorResumido & { conceded: number; matches: number };
 type ItemPresenca = JogadorResumido & {
   matches: number;
@@ -378,6 +390,41 @@ function Paginacao({
   );
 }
 
+// Mini card exibido dentro do painel "MVP Campeonato" — mostra o nome do torneio,
+// o time campeão e o jogador eleito MVP daquele campeonato
+function CardMiniCampeonato({ campeonato }: { campeonato: ItemCampeonato }) {
+  return (
+    <div className="py-3 space-y-2">
+      <p className="text-sm font-semibold text-foreground leading-tight truncate">
+        {campeonato.name}
+      </p>
+      <div className="flex items-center gap-1.5">
+        <Trophy className="size-3 shrink-0 text-gold" />
+        <span className="text-xs text-muted-foreground truncate font-medium">
+          {campeonato.champion ?? "—"}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Crown className="size-3 shrink-0 text-gold" />
+        {campeonato.mvp ? (
+          <>
+            <PlayerAvatar
+              name={campeonato.mvp.name}
+              src={campeonato.mvp.photo_url ?? undefined}
+              size="sm"
+            />
+            <span className="text-xs text-foreground truncate">
+              {campeonato.mvp.name}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground italic">Sem MVP</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Painel (card) com uma lista de ranking — reutilizado tanto para os destaques
 // do ano quanto para os destaques do mês, na grade do desktop e nas abas do mobile.
 // Quando `paginacao` é informada, exibe os controles de avançar/voltar no
@@ -491,6 +538,12 @@ export default function RankPage() {
     (pagina) => `/api/highlights/season/presence?year=${ano}&page=${pagina}`,
     [ano],
   );
+  // Votos de MVP de campeonato do ano — somente torneios encerrados
+  const mvpCampeonatoAnoPainel = usePainelPaginado<ItemCampeonato>(
+    (pagina) =>
+      `/api/highlights/season/tournament-mvp?year=${ano}&page=${pagina}`,
+    [ano],
+  );
   const mvpPainel = usePainelPaginado<ItemMvp>(
     (pagina) =>
       `/api/highlights/monthly/mvp?month=${mes}&year=${anoMes}&page=${pagina}`,
@@ -580,6 +633,16 @@ export default function RankPage() {
         Math.min(presencaAnoPainel.totalPaginas, p + 1),
       ),
   };
+  const paginacaoMvpCampeonatoAno: ControlesPaginacao = {
+    pagina: mvpCampeonatoAnoPainel.pagina,
+    totalPaginas: mvpCampeonatoAnoPainel.totalPaginas,
+    onAnterior: () =>
+      mvpCampeonatoAnoPainel.setPagina((p) => Math.max(1, p - 1)),
+    onProximo: () =>
+      mvpCampeonatoAnoPainel.setPagina((p) =>
+        Math.min(mvpCampeonatoAnoPainel.totalPaginas, p + 1),
+      ),
+  };
   const paginacaoMvp: ControlesPaginacao = {
     pagina: mvpPainel.pagina,
     totalPaginas: mvpPainel.totalPaginas,
@@ -657,8 +720,21 @@ export default function RankPage() {
       {/* ── top 5 da temporada ───────────────────────────────────────────────── */}
       {!carregandoTemporada && podio.length > 0 && (
         <>
-          {/* Grade — visível a partir do desktop, com os três painéis lado a lado */}
-          <div className="hidden lg:grid grid-cols-3 gap-4">
+          {/* Grade — visível a partir do desktop, com os quatro painéis lado a lado */}
+          <div className="hidden lg:grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <PainelRanking
+              titulo={`MVP Campeonato · ${ano}`}
+              icon={Medal}
+              carregando={mvpCampeonatoAnoPainel.carregando}
+              vazio={mvpCampeonatoAnoPainel.itens.length === 0}
+              vazioMensagem="Nenhum campeonato encerrado neste ano."
+              paginacao={paginacaoMvpCampeonatoAno}
+            >
+              {mvpCampeonatoAnoPainel.itens.map((item) => (
+                <CardMiniCampeonato key={item.id} campeonato={item} />
+              ))}
+            </PainelRanking>
+
             <PainelRanking
               titulo={`Artilharia · ${ano}`}
               icon={Target}
@@ -720,9 +796,12 @@ export default function RankPage() {
 
           {/* Abas — visíveis apenas em telas menores que desktop */}
           <div className="lg:hidden">
-            <Tabs defaultValue="artilharia-ano">
+            <Tabs defaultValue="mvp-campeonato-ano">
               <div className="overflow-x-auto pb-0.5">
                 <TabsList>
+                  <TabsTrigger value="mvp-campeonato-ano">
+                    MVP Camp.
+                  </TabsTrigger>
                   <TabsTrigger value="artilharia-ano">Artilharia</TabsTrigger>
                   <TabsTrigger value="gols-sofridos-ano">
                     Gols Sofridos
@@ -730,6 +809,21 @@ export default function RankPage() {
                   <TabsTrigger value="presenca-ano">Presença</TabsTrigger>
                 </TabsList>
               </div>
+
+              <TabsContent value="mvp-campeonato-ano">
+                <PainelRanking
+                  titulo={`MVP Campeonato · ${ano}`}
+                  icon={Medal}
+                  carregando={mvpCampeonatoAnoPainel.carregando}
+                  vazio={mvpCampeonatoAnoPainel.itens.length === 0}
+                  vazioMensagem="Nenhum campeonato encerrado neste ano."
+                  paginacao={paginacaoMvpCampeonatoAno}
+                >
+                  {mvpCampeonatoAnoPainel.itens.map((item) => (
+                    <CardMiniCampeonato key={item.id} campeonato={item} />
+                  ))}
+                </PainelRanking>
+              </TabsContent>
 
               <TabsContent value="artilharia-ano">
                 <PainelRanking
@@ -897,37 +991,15 @@ export default function RankPage() {
 
       {/* Abas — visíveis apenas em telas menores que desktop */}
       <div className="lg:hidden">
-        <Tabs defaultValue="artilharia">
+        <Tabs defaultValue="mvp">
           <div className="overflow-x-auto pb-0.5">
             <TabsList>
-              <TabsTrigger value="artilharia">Artilharia</TabsTrigger>
               <TabsTrigger value="mvp">MVP</TabsTrigger>
+              <TabsTrigger value="artilharia">Artilharia</TabsTrigger>
               <TabsTrigger value="goleiros">Gols Sofridos</TabsTrigger>
               <TabsTrigger value="presenca">Presença</TabsTrigger>
             </TabsList>
           </div>
-
-          <TabsContent value="artilharia">
-            <PainelRanking
-              titulo={`Artilharia · ${MESES[mes - 1]}`}
-              icon={Target}
-              carregando={artilheirosPainel.carregando}
-              vazio={artilheirosPainel.itens.length === 0}
-              paginacao={paginacaoArtilheiros}
-            >
-              {artilheirosPainel.itens.map((item, i) => (
-                <LinhaRanking
-                  key={item.id}
-                  posicao={(artilheirosPainel.pagina - 1) * 5 + i + 1}
-                  jogador={item}
-                  valorPrincipal={String(item.goals)}
-                  valorBarra={item.goals}
-                  maxBarra={maxGols}
-                  corBarra="bg-primary"
-                />
-              ))}
-            </PainelRanking>
-          </TabsContent>
 
           <TabsContent value="mvp">
             <PainelRanking
@@ -946,6 +1018,28 @@ export default function RankPage() {
                   valorBarra={item.votes}
                   maxBarra={maxVotos}
                   corBarra="bg-gold"
+                />
+              ))}
+            </PainelRanking>
+          </TabsContent>
+
+          <TabsContent value="artilharia">
+            <PainelRanking
+              titulo={`Artilharia · ${MESES[mes - 1]}`}
+              icon={Target}
+              carregando={artilheirosPainel.carregando}
+              vazio={artilheirosPainel.itens.length === 0}
+              paginacao={paginacaoArtilheiros}
+            >
+              {artilheirosPainel.itens.map((item, i) => (
+                <LinhaRanking
+                  key={item.id}
+                  posicao={(artilheirosPainel.pagina - 1) * 5 + i + 1}
+                  jogador={item}
+                  valorPrincipal={String(item.goals)}
+                  valorBarra={item.goals}
+                  maxBarra={maxGols}
+                  corBarra="bg-primary"
                 />
               ))}
             </PainelRanking>

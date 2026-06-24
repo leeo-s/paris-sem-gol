@@ -132,8 +132,9 @@ export async function GET(
     for (const partida of partidasComVotos) {
       const contagemPorCandidato: Record<string, number> = {};
       for (const voto of partida.mvp_votes) {
-        contagemPorCandidato[voto.voted_user_id] =
-          (contagemPorCandidato[voto.voted_user_id] ?? 0) + 1;
+        const uid = voto.voted_user_id;
+        if (!uid) continue;
+        contagemPorCandidato[uid] = (contagemPorCandidato[uid] ?? 0) + 1;
       }
 
       let idMvp: string | null = null;

@@ -110,15 +110,24 @@ export async function POST(request: NextRequest) {
                 take: 1,
             }),
 
-            // MVP — mais votos de craque no mês
-            prisma.mvp_votes.groupBy({
-                by: ['voted_user_id'],
-                where: {
-                    matches: { match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo } },
-                },
-                _count: { voted_user_id: true },
-                orderBy: { _count: { voted_user_id: 'desc' } },
-                take: 1,
+            // MVP — mais votos de craque (partidas + campeonatos) no mês
+            Promise.all([
+                prisma.mvp_votes.groupBy({
+                    by: ['voted_user_id'],
+                    where: { matches: { match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo } } },
+                    _count: { voted_user_id: true },
+                }),
+                prisma.tournament_mvp_votes.groupBy({
+                    by: ['voted_user_id'],
+                    where: { created_at: { gte: inicioDoPeriodo, lte: fimDoPeriodo } },
+                    _count: { voted_user_id: true },
+                }),
+            ]).then(([votosPartidas, votosTorneios]) => {
+                const contagemMvp = new Map<string, number>()
+                for (const v of votosPartidas) { const uid = v.voted_user_id; if (uid) contagemMvp.set(uid, (contagemMvp.get(uid) ?? 0) + v._count.voted_user_id) }
+                for (const v of votosTorneios) { const uid = v.voted_user_id; if (uid) contagemMvp.set(uid, (contagemMvp.get(uid) ?? 0) + v._count.voted_user_id) }
+                const topMvp = Array.from(contagemMvp.entries()).sort((a, b) => b[1] - a[1])[0]
+                return topMvp ? [{ voted_user_id: topMvp[0] }] : []
             }),
 
             // Melhor goleiro — menos gols sofridos por partida

@@ -375,7 +375,7 @@ function CartaoAberta({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                  className="text-destructive border-destructive/40 bg-white hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => onRequestExcluir(partida.id)}
                 >
                   <Trash2 className="size-3.5" />

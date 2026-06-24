@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       artilheirosTemporada,
       goleirosComGolsSofridos,
       presencasDoMes,
-      mvpDoMes,
+      mvpAwardsRaw,
       proximaPartida,
       aniversariantesDoMes,
       saldoFinanceiro,
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         take: 5,
       }),
 
-      // Mais presentes do mês — top 10
+      // Mais presentes do mês — top 10 (apenas partidas comuns, sem bracket_key)
       prisma.match_players.groupBy({
         by: ["user_id"],
         where: {
@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
           matches: {
             match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
             status: "completed",
+            bracket_key: null,
           },
         },
         _count: { match_id: true },
@@ -103,15 +104,21 @@ export async function GET(request: NextRequest) {
         take: 10,
       }),
 
-      // MVP do mês consolidado — jogador com mais votos somados em todas as partidas do mês
-      prisma.mvp_votes.groupBy({
-        by: ["voted_user_id"],
+      // MVP awards do mês — partidas regulares (sem bracket_key) + torneios encerrados no mês
+      prisma.mvp_awards.findMany({
         where: {
-          matches: { match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo } },
+          month: mes,
+          year: ano,
+          OR: [
+            { match_id: { not: null }, matches: { bracket_key: null } },
+            { tournament_id: { not: null } },
+          ],
         },
-        _count: { voted_user_id: true },
-        orderBy: { _count: { voted_user_id: "desc" } },
-        take: 1,
+        select: {
+          user_id: true,
+          guest_player_id: true,
+          vote_count: true,
+        },
       }),
 
       // Próxima partida agendada — inclui presença do usuário logado, se já confirmada
@@ -174,10 +181,11 @@ export async function GET(request: NextRequest) {
         saidasMes: Number(saidasMes._sum.amount ?? 0),
       })),
 
-      // Partidas completas do mês e seus votos MVP para calcular o vencedor de cada uma
+      // Partidas regulares (bracket_key null) completas do mês e seus votos MVP
       prisma.matches.findMany({
         where: {
           status: "completed",
+          bracket_key: null,
           match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
         },
         select: {
@@ -201,10 +209,11 @@ export async function GET(request: NextRequest) {
         orderBy: { match_date: "asc" },
       }),
 
-      // Total de partidas encerradas no mês (para calcular % de presença)
+      // Total de partidas comuns encerradas no mês (para calcular % de presença)
       prisma.matches.count({
         where: {
           status: "completed",
+          bracket_key: null,
           match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
         },
       }),
@@ -234,6 +243,112 @@ export async function GET(request: NextRequest) {
       usuarioPodeConfirmar = perfilUsuario?.is_goalkeeper === true || !!entradaConvocatoria
     }
 
+    // Agrupa os awards por jogador para contar quantas vezes cada um foi eleito e total de votos
+    const awardsPorJogador = new Map<
+      string,
+      { userId: string | null; guestId: string | null; vezesEleito: number; totalVotos: number }
+    >();
+
+    for (const award of mvpAwardsRaw) {
+      const chave = award.user_id ?? `guest_${award.guest_player_id}`;
+      const entrada = awardsPorJogador.get(chave);
+      if (entrada) {
+        entrada.vezesEleito++;
+        entrada.totalVotos += award.vote_count;
+      } else {
+        awardsPorJogador.set(chave, {
+          userId: award.user_id,
+          guestId: award.guest_player_id,
+          vezesEleito: 1,
+          totalVotos: award.vote_count,
+        });
+      }
+    }
+
+    const candidatosMvp = Array.from(awardsPorJogador.values());
+    const idsDosUsuariosCandidatos = candidatosMvp
+      .filter((c) => c.userId)
+      .map((c) => c.userId!);
+
+    // Busca presenças e gols dos candidatos a MVP para aplicar os desempates
+    const [presencasCandidatosMvp, golsCandidatosMvp] = await Promise.all([
+      idsDosUsuariosCandidatos.length > 0
+        ? prisma.match_players.groupBy({
+            by: ["user_id"],
+            where: {
+              user_id: { in: idsDosUsuariosCandidatos },
+              matches: {
+                match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
+                status: "completed",
+                bracket_key: null,
+              },
+            },
+            _count: { match_id: true },
+          })
+        : Promise.resolve([]),
+      idsDosUsuariosCandidatos.length > 0
+        ? prisma.goals.groupBy({
+            by: ["scorer_user_id"],
+            where: {
+              scorer_user_id: { in: idsDosUsuariosCandidatos },
+              matches: {
+                match_date: { gte: inicioDoPeriodo, lte: fimDoPeriodo },
+                status: "completed",
+                bracket_key: null,
+              },
+            },
+            _count: { scorer_user_id: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const mapaPresencasCandidatosMvp = new Map(
+      presencasCandidatosMvp.map((p) => [p.user_id!, p._count.match_id])
+    );
+    const mapaGolsCandidatosMvp = new Map(
+      golsCandidatosMvp.map((g) => [g.scorer_user_id!, g._count.scorer_user_id])
+    );
+
+    // Ordena candidatos pelos critérios de desempate: vezes eleito → votos → presenças → gols
+    const mvpVencedor =
+      [...candidatosMvp].sort((candidatoA, candidatoB) => {
+        if (candidatoB.vezesEleito !== candidatoA.vezesEleito)
+          return candidatoB.vezesEleito - candidatoA.vezesEleito;
+        if (candidatoB.totalVotos !== candidatoA.totalVotos)
+          return candidatoB.totalVotos - candidatoA.totalVotos;
+        const presencasA = candidatoA.userId
+          ? (mapaPresencasCandidatosMvp.get(candidatoA.userId) ?? 0)
+          : 0;
+        const presencasB = candidatoB.userId
+          ? (mapaPresencasCandidatosMvp.get(candidatoB.userId) ?? 0)
+          : 0;
+        if (presencasB !== presencasA) return presencasB - presencasA;
+        const golsA = candidatoA.userId
+          ? (mapaGolsCandidatosMvp.get(candidatoA.userId) ?? 0)
+          : 0;
+        const golsB = candidatoB.userId
+          ? (mapaGolsCandidatosMvp.get(candidatoB.userId) ?? 0)
+          : 0;
+        return golsB - golsA;
+      })[0] ?? null;
+
+    // Busca perfil do guest player caso o MVP vencedor seja um convidado (guest_players não tem nickname/photo_url)
+    let perfilGuestMvp: {
+      id: string;
+      name: string;
+      nickname: null;
+      photo_url: null;
+    } | null = null;
+    if (mvpVencedor?.guestId && !mvpVencedor.userId) {
+      const guestEncontrado = await prisma.guest_players.findUnique({
+        where: { id: mvpVencedor.guestId },
+        select: { id: true, name: true },
+      });
+      if (guestEncontrado) {
+        perfilGuestMvp = { ...guestEncontrado, nickname: null, photo_url: null };
+      }
+    }
+
     // Calcula o top 3 de MVPs de cada partida do mês, ordenados por votos
     const mvpsPorPartida = partidasComMvpDoMes.map((partida) => {
       const contagemVotos: Record<
@@ -249,14 +364,13 @@ export async function GET(request: NextRequest) {
         }
       > = {};
 
-      // Agrupa os votos por jogador votado
+      // Agrupa os votos por jogador votado (ignora votos sem user_id ou perfil)
       partida.mvp_votes.forEach((voto) => {
         const id = voto.voted_user_id;
+        const perfil = voto.users_mvp_votes_voted_user_idTousers;
+        if (!id || !perfil) return;
         if (!contagemVotos[id]) {
-          contagemVotos[id] = {
-            votos: 0,
-            jogador: voto.users_mvp_votes_voted_user_idTousers,
-          };
+          contagemVotos[id] = { votos: 0, jogador: perfil };
         }
         contagemVotos[id].votos++;
       });
@@ -277,13 +391,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Busca nomes dos jogadores para os rankings
+    // Busca nomes dos jogadores para os rankings e para o MVP do mês
     const todosOsUserIds = [
       ...artilheirosDoMes.map((a) => a.scorer_user_id!),
       ...artilheirosTemporada.map((a) => a.scorer_user_id!),
       ...goleirosComGolsSofridos.map((g) => g.conceder_user_id!),
       ...presencasDoMes.map((p) => p.user_id!),
-      ...(mvpDoMes[0] ? [mvpDoMes[0].voted_user_id] : []),
+      ...(mvpVencedor?.userId ? [mvpVencedor.userId] : []),
     ];
 
     const perfisDeJogadores = await prisma.users.findMany({
@@ -340,10 +454,14 @@ export async function GET(request: NextRequest) {
         presencas: p._count.match_id,
       })),
       totalPartidasDoMes,
-      mvpDoMes: mvpDoMes[0]
+      // MVP calculado somando awards de partidas regulares + torneios do mês, com desempate por vezes eleito, votos, presenças e gols
+      mvpDoMes: mvpVencedor
         ? {
-            jogador: mapaDePerfis[mvpDoMes[0].voted_user_id],
-            votos: mvpDoMes[0]._count.voted_user_id,
+            jogador: mvpVencedor.userId
+              ? mapaDePerfis[mvpVencedor.userId] ?? null
+              : perfilGuestMvp,
+            vezesEleito: mvpVencedor.vezesEleito,
+            totalVotos: mvpVencedor.totalVotos,
           }
         : null,
       mvpsPorPartida,

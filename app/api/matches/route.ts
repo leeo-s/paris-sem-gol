@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
 
     const partidas = await prisma.matches.findMany({
       where: {
+        bracket_key: null,
         ...(status && { status: status as match_status }),
         ...filtroData,
       },

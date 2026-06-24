@@ -65,7 +65,7 @@ export async function POST(
 
         const { id: matchId } = await params
         const body = await request.json()
-        const { user_id, guest_player_id, is_goalkeeper, confirmed } = body
+        const { user_id, guest_player_id, is_goalkeeper, confirmed, team_id, is_on_loan } = body
 
         if (!user_id && !guest_player_id) {
             return NextResponse.json({ error: 'Informe user_id ou guest_player_id' }, { status: 400 })
@@ -97,10 +97,14 @@ export async function POST(
                     user_id,
                     is_goalkeeper: is_goalkeeper ?? false,
                     confirmed: confirmed ?? false,
+                    team_id: team_id ?? null,
+                    is_on_loan: is_on_loan ?? false,
                 },
                 update: {
                     confirmed: confirmed ?? false,
                     is_goalkeeper: is_goalkeeper ?? false,
+                    team_id: team_id ?? null,
+                    is_on_loan: is_on_loan ?? false,
                     // Limpa o timestamp ao re-confirmar um jogador
                     unconfirmed_at: confirmed ? null : undefined,
                 },
@@ -115,6 +119,8 @@ export async function POST(
                     guest_player_id: guest_player_id ?? null,
                     is_goalkeeper: is_goalkeeper ?? false,
                     confirmed: confirmed ?? false,
+                    team_id: team_id ?? null,
+                    is_on_loan: is_on_loan ?? false,
                 },
                 include: {
                     users: { select: { id: true, name: true, nickname: true, is_goalkeeper: true } },
@@ -133,6 +139,8 @@ export async function POST(
 }
 
 // DELETE /api/matches/:id/players — remove um jogador da lista de presentes (body: { match_player_id })
+// ?hard=true faz remoção permanente (para partidas de torneio)
+// Sem o parâmetro faz soft-delete marcando confirmed=false (partidas regulares)
 export async function DELETE(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -150,6 +158,9 @@ export async function DELETE(
             return NextResponse.json({ error: 'Sem permissão para realizar esta ação' }, { status: 403 })
         }
 
+        const url = new URL(request.url)
+        const hard = url.searchParams.get('hard') === 'true'
+
         const body = await request.json()
         const { match_player_id } = body
 
@@ -157,12 +168,16 @@ export async function DELETE(
             return NextResponse.json({ error: 'match_player_id é obrigatório' }, { status: 400 })
         }
 
-        await prisma.match_players.update({
-            where: { id: match_player_id },
-            data: { confirmed: false, unconfirmed_at: new Date() },
-        })
+        if (hard) {
+            await prisma.match_players.delete({ where: { id: match_player_id } })
+        } else {
+            await prisma.match_players.update({
+                where: { id: match_player_id },
+                data: { confirmed: false, unconfirmed_at: new Date() },
+            })
+        }
 
-        return NextResponse.json({ message: 'Participação cancelada' })
+        return NextResponse.json({ message: hard ? 'Jogador removido do time' : 'Participação cancelada' })
     } catch (error) {
         const respostaPrisma = tratarErroPrisma(error)
         if (respostaPrisma) return respostaPrisma

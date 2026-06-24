@@ -4,16 +4,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { paginar } from "../../_lib/ranking";
 
-type JogadorResumido = {
-  id: string;
-  name: string;
-  nickname: string | null;
-  photo_url: string | null;
-  position: string | null;
-};
-
-// GET /api/highlights/monthly/mvp?month=6&year=2026&page=1 — lista paginada
-// (5 por página) de todos os jogadores que receberam votos de MVP no mês
+// GET /api/highlights/monthly/mvp?month=6&year=2026&page=1
+// Lista paginada (5 por página) dos jogadores que mais vezes foram MVP no mês,
+// usando a tabela mvp_awards como fonte autoritativa de premiações encerradas
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -33,45 +26,53 @@ export async function GET(request: NextRequest) {
     const ano = parseInt(searchParams.get("year") ?? String(agora.getUTCFullYear()));
     const pagina = parseInt(searchParams.get("page") ?? "1");
 
-    // Limites de data do mês, sempre em UTC para acompanhar como match_date
-    // é armazenado (coluna do tipo Date)
-    const inicioMes = new Date(Date.UTC(ano, mes - 1, 1));
-    const fimMes = new Date(Date.UTC(ano, mes, 0, 23, 59, 59, 999));
-    const filtroPartidasMes = { match_date: { gte: inicioMes, lte: fimMes } };
-
-    // Todos os jogadores votados no mês — sem limite, pois a paginação
-    // precisa percorrer a lista completa, não só os 5 primeiros
-    const gruposVotos = await prisma.mvp_votes.groupBy({
-      by: ["voted_user_id"],
-      where: { matches: filtroPartidasMes },
-      _count: { voted_user_id: true },
-      orderBy: { _count: { voted_user_id: "desc" } },
+    const premiacoes = await prisma.mvp_awards.findMany({
+      where: { month: mes, year: ano },
+      select: { user_id: true, guest_player_id: true },
     });
 
-    const { items: grupoPagina, page, totalPages, total } = paginar(
-      gruposVotos,
-      pagina,
-    );
+    // Conta premiações por jogador (pode aparecer mais de uma vez no mês em caso de empate ou várias partidas)
+    const contagem = new Map<string, { userId: string | null; guestId: string | null; awards: number }>()
+    for (const p of premiacoes) {
+      const chave = p.user_id ?? `g:${p.guest_player_id}`
+      const entrada = contagem.get(chave) ?? { userId: p.user_id, guestId: p.guest_player_id, awards: 0 }
+      entrada.awards++
+      contagem.set(chave, entrada)
+    }
 
-    const ids = grupoPagina.map((g) => g.voted_user_id);
-    const jogadores = await prisma.users.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, name: true, nickname: true, photo_url: true, position: true },
-    });
-    const mapaJogadores = new Map<string, JogadorResumido>(
-      jogadores.map((j) => [j.id, j]),
+    const listaOrdenada = Array.from(contagem.values()).sort((a, b) => b.awards - a.awards);
+
+    const { items: grupoPagina, page, totalPages, total } = paginar(listaOrdenada, pagina);
+
+    const items = await Promise.all(
+      grupoPagina.map(async (item) => {
+        if (item.userId) {
+          const jogador = await prisma.users.findUnique({
+            where: { id: item.userId },
+            select: { id: true, name: true, nickname: true, photo_url: true, position: true },
+          });
+          if (!jogador) return null;
+          return { ...jogador, votes: item.awards };
+        }
+
+        if (item.guestId) {
+          const guest = await prisma.guest_players.findUnique({
+            where: { id: item.guestId },
+            select: { id: true, name: true, position: true },
+          });
+          if (!guest) return null;
+          return { ...guest, nickname: null, votes: item.awards };
+        }
+
+        return null;
+      }),
     );
 
     return NextResponse.json({
       page,
       totalPages,
       total,
-      items: grupoPagina
-        .filter((g) => mapaJogadores.has(g.voted_user_id))
-        .map((g) => ({
-          ...mapaJogadores.get(g.voted_user_id)!,
-          votes: g._count.voted_user_id,
-        })),
+      items: items.filter(Boolean),
     });
   } catch (error) {
     console.error("[GET /api/highlights/monthly/mvp]", error);

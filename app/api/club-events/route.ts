@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, event_date, member_fee, guest_fee, description } = body
+        const { name, event_date, event_time, location, member_fee, guest_fee, description } = body
 
         if (!name || !event_date) {
             return NextResponse.json({ error: 'Nome e data do evento são obrigatórios' }, { status: 400 })
@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
             data: {
                 name,
                 event_date: new Date(event_date),
+                event_time: event_time ?? null,
+                location: location ?? null,
                 member_fee: member_fee ?? 0,
                 guest_fee: guest_fee ?? 0,
                 description,

@@ -23,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/partidas": "Partidas",
   "/partidas/nova": "Nova Partida",
   "/configuration": "Configurações",
+  "/campeonatos": "Campeonatos",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -44,10 +45,12 @@ function getInitials(name: string): string {
 export function AppHeader({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
 
+  // Resolve o título pela rota exata ou por prefixo para rotas dinâmicas
   const title =
     PAGE_TITLES[pathname] ??
     (pathname.startsWith("/partidas/") ? "Partidas" : null) ??
     (pathname.startsWith("/jogadores/") ? "Elenco" : null) ??
+    (pathname.startsWith("/campeonatos/") ? "Campeonatos" : null) ??
     "Dashboard";
   const now = new Date();
   const month = now.toLocaleDateString("pt-BR", { month: "long" });

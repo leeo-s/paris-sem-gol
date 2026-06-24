@@ -41,18 +41,17 @@ export async function GET(request: NextRequest) {
     const filtroPartidasMes = { match_date: { gte: inicioMes, lte: fimMes } };
 
     const [totalPartidasMes, gruposPresenca] = await Promise.all([
-      // Total de partidas encerradas no mês — usado para calcular % de presença
+      // Total de partidas comuns encerradas no mês (sem torneios)
       prisma.matches.count({
-        where: { status: "completed", ...filtroPartidasMes },
+        where: { status: "completed", bracket_key: null, ...filtroPartidasMes },
       }),
 
-      // Todos os jogadores com presença no mês — sem limite, pois a paginação
-      // precisa percorrer a lista completa, não só os 5 primeiros
+      // Todos os jogadores com presença em partidas comuns no mês
       prisma.match_players.groupBy({
         by: ["user_id"],
         where: {
           user_id: { not: null },
-          matches: { status: "completed", ...filtroPartidasMes },
+          matches: { status: "completed", bracket_key: null, ...filtroPartidasMes },
         },
         _count: { match_id: true },
         orderBy: { _count: { match_id: "desc" } },

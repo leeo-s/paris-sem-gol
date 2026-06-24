@@ -27,19 +27,43 @@ export async function GET(request: NextRequest) {
                 tournament_teams: {
                     orderBy: { points: 'desc' },
                 },
+                tournament_registrations: {
+                    where: { user_id: user.id },
+                    select: { id: true, user_id: true },
+                },
+                tournament_mvp_voting_sessions: {
+                    select: { is_closed: true, closes_at: true, total_votes_cast: true, eligible_voters: true },
+                },
+                _count: {
+                    select: { tournament_registrations: true },
+                },
                 users: { select: { id: true, name: true } },
             },
             orderBy: { created_at: 'desc' },
         })
 
-        return NextResponse.json(campeonatos)
+        // IDs dos torneios em que o usuário está em algum time (para controle do botão de MVP)
+        const timesDoUsuario = await prisma.tournament_team_players.findMany({
+            where: { user_id: user.id },
+            select: { tournament_teams: { select: { tournament_id: true } } },
+        })
+        const torneiosParticipados = new Set(
+            timesDoUsuario.map((t) => t.tournament_teams.tournament_id),
+        )
+
+        const campeonatosComParticipacao = campeonatos.map((c) => ({
+            ...c,
+            userParticipated: torneiosParticipados.has(c.id),
+        }))
+
+        return NextResponse.json(campeonatosComParticipacao)
     } catch (error) {
         console.error('[GET /api/tournaments]', error)
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
     }
 }
 
-// POST /api/tournaments — cria um novo campeonato interno ou evento especial
+// POST /api/tournaments — cria um novo campeonato com configurações completas
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createServerSupabaseClient()
@@ -55,45 +79,61 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { name, format, is_special_event, start_date, end_date, description, teams } = body
+        const {
+            name,
+            is_special_event,
+            location,
+            start_date,
+            end_date,
+            description,
+            num_teams,
+            squad_size,
+            settings,
+        } = body
 
-        if (!name) {
+        if (!name?.trim()) {
             return NextResponse.json({ error: 'Nome do campeonato é obrigatório' }, { status: 400 })
         }
 
-        const formatosValidos = ['round_robin', 'knockout']
-        if (format && !formatosValidos.includes(format)) {
-            return NextResponse.json({ error: `Formato inválido. Use: ${formatosValidos.join(', ')}` }, { status: 400 })
+        if (num_teams !== undefined && (num_teams < 2 || num_teams > 64)) {
+            return NextResponse.json({ error: 'Número de times deve ser entre 2 e 64' }, { status: 400 })
         }
 
-        // Cria o campeonato e os times em uma transação
-        const novoCampeonato = await prisma.$transaction(async (tx) => {
-            const campeonato = await tx.tournaments.create({
-                data: {
-                    name,
-                    format: format ?? 'round_robin',
-                    is_special_event: is_special_event ?? false,
-                    start_date: start_date ? new Date(start_date) : null,
-                    end_date: end_date ? new Date(end_date) : null,
-                    description,
-                    created_by: user.id,
-                },
-            })
+        if (squad_size !== undefined && (squad_size < 2 || squad_size > 20)) {
+            return NextResponse.json({ error: 'Tamanho do elenco deve ser entre 2 e 20' }, { status: 400 })
+        }
 
-            // Cria os times do campeonato se informados
-            if (Array.isArray(teams) && teams.length > 0) {
-                await tx.tournament_teams.createMany({
-                    data: teams.map((nomeDoTime: string) => ({
-                        tournament_id: campeonato.id,
-                        team_name: nomeDoTime,
-                    })),
-                })
-            }
+        const formato = settings?.format
+        const timesClassificados = settings?.qualifying_teams
 
-            return tx.tournaments.findUnique({
-                where: { id: campeonato.id },
-                include: { tournament_teams: true },
-            })
+        if (
+            formato === 'league_and_bracket' &&
+            timesClassificados !== undefined &&
+            num_teams !== undefined &&
+            timesClassificados > num_teams
+        ) {
+            return NextResponse.json(
+                { error: 'Times classificados para o mata-mata não pode ser maior que o total de times' },
+                { status: 400 }
+            )
+        }
+
+        const novoCampeonato = await prisma.tournaments.create({
+            data: {
+                name: name.trim(),
+                is_special_event: is_special_event ?? false,
+                location: location?.trim() || null,
+                start_date: start_date ? new Date(start_date) : null,
+                end_date: end_date ? new Date(end_date) : null,
+                description: description?.trim() || null,
+                num_teams: num_teams ?? 4,
+                squad_size: squad_size ?? 7,
+                settings: settings ?? {},
+                created_by: user.id,
+            },
+            include: {
+                tournament_teams: true,
+            },
         })
 
         return NextResponse.json(novoCampeonato, { status: 201 })

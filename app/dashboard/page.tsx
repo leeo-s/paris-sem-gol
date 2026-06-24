@@ -74,7 +74,7 @@ type DashboardData = {
   }>;
   maisPresentesDoMes: Array<{ jogador: PlayerProfile; presencas: number }>;
   totalPartidasDoMes: number;
-  mvpDoMes: { jogador: PlayerProfile; votos: number } | null;
+  mvpDoMes: { jogador: PlayerProfile; vezesEleito: number; totalVotos: number } | null;
   mvpsPorPartida: Array<{
     data: string;
     local: string | null;
@@ -110,11 +110,9 @@ type DashboardData = {
 
 function MvpCard({
   mvp,
-  wins,
   mes,
 }: {
   mvp: DashboardData["mvpDoMes"];
-  wins: number;
   mes: number;
 }) {
   const mon = monthAbbr(mes);
@@ -139,9 +137,9 @@ function MvpCard({
                   {dName(mvp.jogador.name, mvp.jogador.nickname)}
                 </h3>
                 <p className="text-sm text-accent-foreground/70 mt-1.5">
-                  {wins > 0
-                    ? `${wins}× Craque da Partida em ${monFull}`
-                    : `${mvp.votos} votos este mês`}
+                  {mvp.vezesEleito > 0
+                    ? `${mvp.vezesEleito}× eleito MVP em ${monFull}`
+                    : `${mvp.totalVotos} votos este mês`}
                 </p>
               </>
             ) : (
@@ -631,12 +629,6 @@ export default async function DashboardPage() {
         : 0,
   }));
 
-  const mvpWins = mvpDoMes?.jogador
-    ? mvpsPorPartida.filter(
-        (p) => p.top3Mvps[0]?.jogador.id === mvpDoMes.jogador.id,
-      ).length
-    : 0;
-
   const monName = monthName(mes);
   const monCap = monName.charAt(0).toUpperCase() + monName.slice(1);
 
@@ -647,7 +639,7 @@ export default async function DashboardPage() {
 
       {/* Row 2: MVP · Saldo · Aniversariantes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <MvpCard mvp={mvpDoMes} wins={mvpWins} mes={mes} />
+        <MvpCard mvp={mvpDoMes} mes={mes} />
         <SaldoCard caixa={caixa} mes={mes} ano={ano} />
         <AniversariantesCard aniversariantes={aniversariantesDoMes} mes={mes} />
       </div>

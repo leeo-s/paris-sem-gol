@@ -64,8 +64,9 @@ export async function GET(
       // Conta votos por candidato para identificar o MVP da partida
       const contagemPorCandidato = partida.mvp_votes.reduce(
         (acumulador, voto) => {
-          acumulador[voto.voted_user_id] =
-            (acumulador[voto.voted_user_id] ?? 0) + 1;
+          const uid = voto.voted_user_id;
+          if (!uid) return acumulador;
+          acumulador[uid] = (acumulador[uid] ?? 0) + 1;
           return acumulador;
         },
         {} as Record<string, number>,

@@ -675,7 +675,7 @@ function ViewAgendada({
             <Button
               size="sm"
               variant="outline"
-              className="mt-3 sm:mt-5 text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+              className="mt-3 sm:mt-5 text-destructive border-destructive/40 bg-white hover:bg-destructive/10 hover:text-destructive"
               onClick={onRequestExcluir}
             >
               <Trash2 className="size-3.5" />
@@ -861,6 +861,55 @@ function ViewEncerrada({ partida }: { partida: Partida }) {
 
       {/* Estatísticas dos jogadores */}
       <section className="space-y-3">
+        {/* Top 5 MVP */}
+        {topMvp.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-4 rounded-full bg-gold" />
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Top 5 MVP
+              </h2>
+            </div>
+
+            <div className="bg-card rounded-xl ring-1 ring-foreground/10 divide-y divide-border overflow-hidden">
+              {topMvp.map((e, idx) => (
+                <div
+                  key={e.chave}
+                  className="flex items-center gap-4 px-4 py-3"
+                >
+                  <span className="text-base shrink-0 w-6 text-center leading-none">
+                    {medalhas[idx] ?? `${idx + 1}.`}
+                  </span>
+                  <AvatarJogador
+                    nome={e.nome}
+                    photoUrl={e.photoUrl}
+                    size="sm"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {e.nome}
+                      </p>
+                      <p className="text-xs font-semibold text-gold shrink-0">
+                        {e.votosRecebidos}{" "}
+                        {e.votosRecebidos === 1 ? "voto" : "votos"}
+                      </p>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gold rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(e.votosRecebidos / maxVotos) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-muted-foreground/40" />
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -1024,48 +1073,6 @@ function ViewEncerrada({ partida }: { partida: Partida }) {
           </>
         )}
       </section>
-
-      {/* Top 5 MVP */}
-      {topMvp.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-4 rounded-full bg-gold" />
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Top 5 MVP
-            </h2>
-          </div>
-
-          <div className="bg-card rounded-xl ring-1 ring-foreground/10 divide-y divide-border overflow-hidden">
-            {topMvp.map((e, idx) => (
-              <div key={e.chave} className="flex items-center gap-4 px-4 py-3">
-                <span className="text-base shrink-0 w-6 text-center leading-none">
-                  {medalhas[idx] ?? `${idx + 1}.`}
-                </span>
-                <AvatarJogador nome={e.nome} photoUrl={e.photoUrl} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {e.nome}
-                    </p>
-                    <p className="text-xs font-semibold text-gold shrink-0">
-                      {e.votosRecebidos}{" "}
-                      {e.votosRecebidos === 1 ? "voto" : "votos"}
-                    </p>
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gold rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(e.votosRecebidos / maxVotos) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
