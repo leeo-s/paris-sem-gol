@@ -74,7 +74,11 @@ type DashboardData = {
   }>;
   maisPresentesDoMes: Array<{ jogador: PlayerProfile; presencas: number }>;
   totalPartidasDoMes: number;
-  mvpDoMes: { jogador: PlayerProfile; vezesEleito: number; totalVotos: number } | null;
+  mvpDoMes: {
+    jogador: PlayerProfile;
+    vezesEleito: number;
+    totalVotos: number;
+  } | null;
   mvpsPorPartida: Array<{
     data: string;
     local: string | null;
@@ -86,6 +90,8 @@ type DashboardData = {
     match_date: string;
     location: string | null;
     status: string;
+    title: string | null;
+    bracket_key: string | null;
     usuarioPodeConfirmar: boolean;
     usuarioJaConfirmou: boolean;
   } | null;

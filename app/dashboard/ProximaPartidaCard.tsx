@@ -19,6 +19,8 @@ type ProximaPartida = {
   match_date: string;
   location: string | null;
   status: string;
+  title: string | null;
+  bracket_key: string | null;
   usuarioPodeConfirmar: boolean;
   usuarioJaConfirmou: boolean;
 };
@@ -129,7 +131,7 @@ export function ProximaPartidaCard({
               Próxima Partida
             </p>
             <h2 className="font-heading text-xl md:text-2xl leading-tight text-primary-foreground">
-              Pelada Semanal
+              {match.title}
             </h2>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               {match.location && (
@@ -141,8 +143,8 @@ export function ProximaPartidaCard({
             </div>
           </div>
 
-          {/* Botão desktop — visível apenas se o usuário pode confirmar */}
-          {match.usuarioPodeConfirmar && (
+          {/* Botão desktop — visível apenas se o usuário pode confirmar e não é partida de campeonato */}
+          {match.usuarioPodeConfirmar && !match.bracket_key && (
             <Button
               size="sm"
               variant="outline"
@@ -161,8 +163,8 @@ export function ProximaPartidaCard({
           )}
         </div>
 
-        {/* Botão mobile — visível apenas se o usuário pode confirmar */}
-        {match.usuarioPodeConfirmar && (
+        {/* Botão mobile — visível apenas se o usuário pode confirmar e não é partida de campeonato */}
+        {match.usuarioPodeConfirmar && !match.bracket_key && (
           <Button
             size="sm"
             variant="outline"

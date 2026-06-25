@@ -162,14 +162,6 @@ function brl(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function brlCompact(valor: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(valor);
-}
 
 function formatarData(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -223,7 +215,7 @@ function CartaoResumo({
                 coresValor[variante],
               )}
             >
-              {brlCompact(valor)}
+              {brl(valor)}
             </p>
             <p className="text-xs text-muted-foreground mt-1.5">{titulo}</p>
           </>
@@ -258,7 +250,7 @@ function BarraCategoria({
             tipo === "expense" ? "text-destructive" : "text-foreground",
           )}
         >
-          {brlCompact(valor)}
+          {brl(valor)}
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -304,7 +296,7 @@ function ItemTransacao({ transacao }: { transacao: Transacao }) {
         )}
       >
         {entrada ? "+" : "-"}
-        {brlCompact(valor)}
+        {brl(valor)}
       </span>
     </div>
   );
@@ -815,7 +807,7 @@ function CardCaixaTotal({
                   caixaTotal >= 0 ? "text-success" : "text-destructive",
                 )}
               >
-                {brlCompact(caixaTotal)}
+                {brl(caixaTotal)}
               </p>
             </div>
 
@@ -836,7 +828,7 @@ function CardCaixaTotal({
                         m.saldo >= 0 ? "text-success" : "text-destructive",
                       )}
                     >
-                      {brlCompact(m.saldo)}
+                      {brl(m.saldo)}
                     </span>
                   </div>
                 ))}

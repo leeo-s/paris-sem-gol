@@ -123,7 +123,10 @@ export async function GET(request: NextRequest) {
 
       // Próxima partida agendada — inclui presença do usuário logado, se já confirmada
       prisma.matches.findFirst({
-        where: { status: "scheduled", match_date: { gte: new Date() } },
+        where: {
+          status: "scheduled",
+          match_date: { gte: new Date() },
+        },
         orderBy: { match_date: "asc" },
         include: {
           match_players: {
@@ -220,13 +223,13 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Determina se o usuário logado pode confirmar presença e se já confirmou
-    let usuarioPodeConfirmar = false
-    const usuarioJaConfirmou = !!(proximaPartida?.match_players?.[0])
+    let usuarioPodeConfirmar = false;
+    const usuarioJaConfirmou = !!proximaPartida?.match_players?.[0];
 
     if (proximaPartida) {
-      const dataPartida = new Date(proximaPartida.match_date)
-      const mesPartida = dataPartida.getUTCMonth() + 1
-      const anoPartida = dataPartida.getUTCFullYear()
+      const dataPartida = new Date(proximaPartida.match_date);
+      const mesPartida = dataPartida.getUTCMonth() + 1;
+      const anoPartida = dataPartida.getUTCFullYear();
 
       // Busca perfil e convocatória do usuário para o mês da partida em paralelo
       const [perfilUsuario, entradaConvocatoria] = await Promise.all([
@@ -235,18 +238,29 @@ export async function GET(request: NextRequest) {
           select: { is_goalkeeper: true },
         }),
         prisma.monthly_roster.findFirst({
-          where: { user_id: user.id, month: mesPartida, year: anoPartida, status: 'active' },
+          where: {
+            user_id: user.id,
+            month: mesPartida,
+            year: anoPartida,
+            status: "active",
+          },
         }),
-      ])
+      ]);
 
       // Goleiros podem participar de qualquer partida; os demais precisam da convocatória ativa
-      usuarioPodeConfirmar = perfilUsuario?.is_goalkeeper === true || !!entradaConvocatoria
+      usuarioPodeConfirmar =
+        perfilUsuario?.is_goalkeeper === true || !!entradaConvocatoria;
     }
 
     // Agrupa os awards por jogador para contar quantas vezes cada um foi eleito e total de votos
     const awardsPorJogador = new Map<
       string,
-      { userId: string | null; guestId: string | null; vezesEleito: number; totalVotos: number }
+      {
+        userId: string | null;
+        guestId: string | null;
+        vezesEleito: number;
+        totalVotos: number;
+      }
     >();
 
     for (const award of mvpAwardsRaw) {
@@ -303,10 +317,13 @@ export async function GET(request: NextRequest) {
     ]);
 
     const mapaPresencasCandidatosMvp = new Map(
-      presencasCandidatosMvp.map((p) => [p.user_id!, p._count.match_id])
+      presencasCandidatosMvp.map((p) => [p.user_id!, p._count.match_id]),
     );
     const mapaGolsCandidatosMvp = new Map(
-      golsCandidatosMvp.map((g) => [g.scorer_user_id!, g._count.scorer_user_id])
+      golsCandidatosMvp.map((g) => [
+        g.scorer_user_id!,
+        g._count.scorer_user_id,
+      ]),
     );
 
     // Ordena candidatos pelos critérios de desempate: vezes eleito → votos → presenças → gols
@@ -345,7 +362,11 @@ export async function GET(request: NextRequest) {
         select: { id: true, name: true },
       });
       if (guestEncontrado) {
-        perfilGuestMvp = { ...guestEncontrado, nickname: null, photo_url: null };
+        perfilGuestMvp = {
+          ...guestEncontrado,
+          nickname: null,
+          photo_url: null,
+        };
       }
     }
 
@@ -458,7 +479,7 @@ export async function GET(request: NextRequest) {
       mvpDoMes: mvpVencedor
         ? {
             jogador: mvpVencedor.userId
-              ? mapaDePerfis[mvpVencedor.userId] ?? null
+              ? (mapaDePerfis[mvpVencedor.userId] ?? null)
               : perfilGuestMvp,
             vezesEleito: mvpVencedor.vezesEleito,
             totalVotos: mvpVencedor.totalVotos,
@@ -472,6 +493,7 @@ export async function GET(request: NextRequest) {
             match_date: proximaPartida.match_date,
             location: proximaPartida.location,
             status: proximaPartida.status,
+            title: proximaPartida.title,
             usuarioPodeConfirmar,
             usuarioJaConfirmou,
           }

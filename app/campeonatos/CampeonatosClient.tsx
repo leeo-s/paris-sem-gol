@@ -108,26 +108,21 @@ function formatDateRange(start: string | null, end: string | null): string {
   if (start && end) {
     const s = new Date(start);
     const e = new Date(end);
-    const mesS = s.toLocaleDateString("pt-BR", {
-      month: "short",
-      timeZone: "UTC",
-    });
-    const mesE = e.toLocaleDateString("pt-BR", {
-      month: "short",
-      timeZone: "UTC",
-    });
+    const diaS = s.getUTCDate();
+    const diaE = e.getUTCDate();
+    const mesS = s.toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" });
+    const mesE = e.toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" });
     const anoS = s.getUTCFullYear();
     const anoE = e.getUTCFullYear();
     if (anoS === anoE)
-      return `${capitalize(mesS)} – ${capitalize(mesE)} ${anoE}`;
-    return `${capitalize(mesS)} ${anoS} – ${capitalize(mesE)} ${anoE}`;
+      return `${diaS} ${capitalize(mesS)} – ${diaE} ${capitalize(mesE)} ${anoE}`;
+    return `${diaS} ${capitalize(mesS)} ${anoS} – ${diaE} ${capitalize(mesE)} ${anoE}`;
   }
   const d = new Date(start ?? end ?? "");
-  return d.toLocaleDateString("pt-BR", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  const dia = d.getUTCDate();
+  const mes = d.toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" });
+  const ano = d.getUTCFullYear();
+  return `${dia} ${capitalize(mes)} ${ano}`;
 }
 
 function toInputDate(dateStr: string): string {
@@ -323,15 +318,10 @@ function CardCampeonatoInscricoes({
           {camp.name}
         </h3>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
-          {camp.start_date && (
+          {(camp.start_date || camp.end_date) && (
             <span className="flex items-center gap-1">
               <Calendar className="size-3.5" />
-              {new Date(camp.start_date).toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                timeZone: "UTC",
-              })}
+              {formatDateRange(camp.start_date, camp.end_date)}
             </span>
           )}
           <span className="flex items-center gap-1">
