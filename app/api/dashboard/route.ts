@@ -222,6 +222,14 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Busca perfil do usuário logado para checar se é goleiro (usado tanto na elegibilidade quanto no dashboard)
+    const perfilDoUsuarioLogado = await prisma.users.findUnique({
+      where: { id: user.id },
+      select: { is_goalkeeper: true },
+    });
+
+    const isGoleiro = perfilDoUsuarioLogado?.is_goalkeeper === true;
+
     // Determina se o usuário logado pode confirmar presença e se já confirmou
     let usuarioPodeConfirmar = false;
     const usuarioJaConfirmou = !!proximaPartida?.match_players?.[0];
@@ -231,25 +239,17 @@ export async function GET(request: NextRequest) {
       const mesPartida = dataPartida.getUTCMonth() + 1;
       const anoPartida = dataPartida.getUTCFullYear();
 
-      // Busca perfil e convocatória do usuário para o mês da partida em paralelo
-      const [perfilUsuario, entradaConvocatoria] = await Promise.all([
-        prisma.users.findUnique({
-          where: { id: user.id },
-          select: { is_goalkeeper: true },
-        }),
-        prisma.monthly_roster.findFirst({
-          where: {
-            user_id: user.id,
-            month: mesPartida,
-            year: anoPartida,
-            status: "active",
-          },
-        }),
-      ]);
+      const entradaConvocatoria = await prisma.monthly_roster.findFirst({
+        where: {
+          user_id: user.id,
+          month: mesPartida,
+          year: anoPartida,
+          status: "active",
+        },
+      });
 
       // Goleiros podem participar de qualquer partida; os demais precisam da convocatória ativa
-      usuarioPodeConfirmar =
-        perfilUsuario?.is_goalkeeper === true || !!entradaConvocatoria;
+      usuarioPodeConfirmar = isGoleiro || !!entradaConvocatoria;
     }
 
     // Agrupa os awards por jogador para contar quantas vezes cada um foi eleito e total de votos
@@ -500,6 +500,7 @@ export async function GET(request: NextRequest) {
         : null,
       aniversariantesDoMes: aniversariantesDoMesAtual,
       caixa: saldoFinanceiro,
+      isGoleiro,
     });
   } catch (error) {
     console.error("[GET /api/dashboard]", error);

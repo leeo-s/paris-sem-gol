@@ -110,6 +110,7 @@ type DashboardData = {
     entradasMes: number;
     saidasMes: number;
   };
+  isGoleiro: boolean;
 };
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -624,6 +625,7 @@ export default async function DashboardPage() {
     proximaPartida,
     aniversariantesDoMes,
     caixa,
+    isGoleiro,
   } = data;
 
   const { mes, ano } = periodo;
@@ -651,8 +653,13 @@ export default async function DashboardPage() {
         <AniversariantesCard aniversariantes={aniversariantesDoMes} mes={mes} />
       </div>
 
-      {/* Row 3: Artilheiros Mês · Artilheiros Temporada · Goleiros */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Row 3: Artilheiros Mês · Artilheiros Temporada · Goleiros (só para goleiros) */}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-4",
+          isGoleiro ? "sm:grid-cols-2 md:grid-cols-3" : "sm:grid-cols-2",
+        )}
+      >
         <ArtilheirosCard
           data={artilheirosDoMes}
           titulo={`Artilheiros · ${monCap}`}
@@ -663,7 +670,7 @@ export default async function DashboardPage() {
           titulo={`Artilheiros · ${ano}`}
           iconType="target"
         />
-        <GoleirosCard data={goleirosComMenosGols} mes={mes} />
+        {isGoleiro && <GoleirosCard data={goleirosComMenosGols} mes={mes} />}
       </div>
 
       {/* Row 4: Partidas com MVP · Presenças */}
