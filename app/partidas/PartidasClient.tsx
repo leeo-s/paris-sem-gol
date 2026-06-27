@@ -207,23 +207,45 @@ function calcularArtilheiro(
   return top ?? null;
 }
 
+// Retorna todos os goleiros empatados com menos gols sofridos, ignorando jogadores de linha
 function calcularMelhorGoleiro(
   goalsConceded: GoalConcededEntry[],
-): { nome: string; golsSofridos: number } | null {
-  if (!goalsConceded.length) return null;
+  matchPlayers: Partida["match_players"],
+): { nome: string; golsSofridos: number }[] {
+  if (!goalsConceded.length) return [];
+
+  // Monta conjuntos com os IDs de quem está marcado como goleiro na partida
+  const idsGoleirosUsuario = new Set(
+    matchPlayers
+      .filter((p) => p.is_goalkeeper && p.user_id)
+      .map((p) => p.user_id!),
+  );
+  const idsGoleirosConvidado = new Set(
+    matchPlayers
+      .filter((p) => p.is_goalkeeper && p.guest_player_id)
+      .map((p) => p.guest_player_id!),
+  );
 
   const contagem: Record<string, { nome: string; golsSofridos: number }> = {};
   for (const g of goalsConceded) {
+    // Ignora registros de jogadores que não são goleiros
+    const ehGoleiro =
+      (g.conceder_user_id && idsGoleirosUsuario.has(g.conceder_user_id)) ||
+      (g.conceder_guest_id && idsGoleirosConvidado.has(g.conceder_guest_id));
+    if (!ehGoleiro) continue;
+
     const chave = g.conceder_user_id ?? g.conceder_guest_id ?? "anon";
     const nome = nomeExibido(g.users, g.guest_players);
     if (!contagem[chave]) contagem[chave] = { nome, golsSofridos: 0 };
     contagem[chave].golsSofridos += g.amount;
   }
 
-  const melhor = Object.values(contagem).sort(
-    (a, b) => a.golsSofridos - b.golsSofridos,
-  )[0];
-  return melhor ?? null;
+  const todosGoleiros = Object.values(contagem);
+  if (!todosGoleiros.length) return [];
+
+  // Pega o menor número de gols sofridos e retorna todos que atingiram esse valor
+  const menorGolsSofridos = Math.min(...todosGoleiros.map((g) => g.golsSofridos));
+  return todosGoleiros.filter((g) => g.golsSofridos === menorGolsSofridos);
 }
 
 function calcularMvp(
@@ -611,9 +633,10 @@ function CartaoEncerrada({
 }) {
   const dataCompleta = formatDateFull(partida.match_date);
   const artilheiro = calcularArtilheiro(partida.goals);
-  const melhorGoleiro = calcularMelhorGoleiro(partida.goals_conceded);
+  // Pode retornar múltiplos goleiros em caso de empate
+  const goleirosDestaque = calcularMelhorGoleiro(partida.goals_conceded, partida.match_players);
   const mvp = calcularMvp(partida.mvp_votes);
-  const temEstatisticas = artilheiro || melhorGoleiro || mvp;
+  const temEstatisticas = artilheiro || goleirosDestaque.length > 0 || mvp;
 
   // Exibe o botão de votação se a sessão estiver aberta e o usuário tiver participado
   const podeVotarMvp =
@@ -666,17 +689,18 @@ function CartaoEncerrada({
                 </span>
               </div>
             )}
-            {melhorGoleiro && (
+            {goleirosDestaque.length > 0 && (
               <div className="flex items-center gap-2 text-xs">
                 <Shield className="size-3.5 shrink-0 text-info" />
                 <span className="text-muted-foreground">GK menos vazado:</span>
+                {/* Exibe todos os goleiros empatados separados por vírgula */}
                 <span className="font-medium text-foreground">
-                  {melhorGoleiro.nome}
+                  {goleirosDestaque.map((g) => g.nome).join(", ")}
                 </span>
                 <span className="text-muted-foreground">
-                  ({melhorGoleiro.golsSofridos}{" "}
-                  {melhorGoleiro.golsSofridos === 1 ? "gol" : "gols"} sofrido
-                  {melhorGoleiro.golsSofridos !== 1 ? "s" : ""})
+                  ({goleirosDestaque[0].golsSofridos}{" "}
+                  {goleirosDestaque[0].golsSofridos === 1 ? "gol" : "gols"} sofrido
+                  {goleirosDestaque[0].golsSofridos !== 1 ? "s" : ""})
                 </span>
               </div>
             )}

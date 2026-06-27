@@ -520,13 +520,9 @@ export default function RankPage() {
   const [mes, setMes] = useState(agora.getMonth() + 1);
   const [anoMes, setAnoMes] = useState(agora.getFullYear());
 
-  // Pódio e gols sofridos — únicos sem paginação (top 3 e top 5 fixos)
+  // Pódio — único sem paginação (top 3 fixo)
   const [podio, setPodio] = useState<ItemPodio[]>([]);
-  const [golsSofridosAno, setGolsSofridosAno] = useState<ItemGoleiro[]>([]);
   const [carregandoTemporada, setCarregandoTemporada] = useState(true);
-
-  const [goleiros, setGoleiros] = useState<ItemGoleiro[]>([]);
-  const [carregandoMes, setCarregandoMes] = useState(true);
 
   // Listas completas com paginação (5 por página) — artilharia, presença e
   // MVP, tanto do ano quanto do mês
@@ -559,8 +555,18 @@ export default function RankPage() {
       `/api/highlights/monthly/presence?month=${mes}&year=${anoMes}&page=${pagina}`,
     [mes, anoMes],
   );
+  const golsSofridosAnoPainel = usePainelPaginado<ItemGoleiro>(
+    (pagina) =>
+      `/api/highlights/season/goals-conceded?year=${ano}&page=${pagina}`,
+    [ano],
+  );
+  const golsSofridosMesPainel = usePainelPaginado<ItemGoleiro>(
+    (pagina) =>
+      `/api/highlights/monthly/goals-conceded?month=${mes}&year=${anoMes}&page=${pagina}`,
+    [mes, anoMes],
+  );
 
-  // ── busca do pódio e gols sofridos do ano ────────────────────────────────
+  // ── busca do pódio do ano ────────────────────────────────────────────────
   const buscarTemporada = useCallback(async () => {
     setCarregandoTemporada(true);
     try {
@@ -568,36 +574,15 @@ export default function RankPage() {
       if (res.ok) {
         const dados = await res.json();
         setPodio(dados.podium);
-        setGolsSofridosAno(dados.topGoalsConceded);
       }
     } finally {
       setCarregandoTemporada(false);
     }
   }, [ano]);
 
-  // ── busca dos gols sofridos do mês ───────────────────────────────────────
-  const buscarMes = useCallback(async () => {
-    setCarregandoMes(true);
-    try {
-      const res = await fetch(
-        `/api/highlights/monthly?month=${mes}&year=${anoMes}`,
-      );
-      if (res.ok) {
-        const dados = await res.json();
-        setGoleiros(dados.goalsConceded);
-      }
-    } finally {
-      setCarregandoMes(false);
-    }
-  }, [mes, anoMes]);
-
   useEffect(() => {
     buscarTemporada();
   }, [buscarTemporada]);
-
-  useEffect(() => {
-    buscarMes();
-  }, [buscarMes]);
 
   function mesAnterior() {
     if (mes === 1) {
@@ -666,6 +651,26 @@ export default function RankPage() {
     onProximo: () =>
       presencaPainel.setPagina((p) =>
         Math.min(presencaPainel.totalPaginas, p + 1),
+      ),
+  };
+  const paginacaoGolsSofridosAno: ControlesPaginacao = {
+    pagina: golsSofridosAnoPainel.pagina,
+    totalPaginas: golsSofridosAnoPainel.totalPaginas,
+    onAnterior: () =>
+      golsSofridosAnoPainel.setPagina((p) => Math.max(1, p - 1)),
+    onProximo: () =>
+      golsSofridosAnoPainel.setPagina((p) =>
+        Math.min(golsSofridosAnoPainel.totalPaginas, p + 1),
+      ),
+  };
+  const paginacaoGolsSofridosMes: ControlesPaginacao = {
+    pagina: golsSofridosMesPainel.pagina,
+    totalPaginas: golsSofridosMesPainel.totalPaginas,
+    onAnterior: () =>
+      golsSofridosMesPainel.setPagina((p) => Math.max(1, p - 1)),
+    onProximo: () =>
+      golsSofridosMesPainel.setPagina((p) =>
+        Math.min(golsSofridosMesPainel.totalPaginas, p + 1),
       ),
   };
 
@@ -758,13 +763,14 @@ export default function RankPage() {
             <PainelRanking
               titulo={`Gols Sofridos · ${ano}`}
               icon={Shield}
-              carregando={carregandoTemporada}
-              vazio={golsSofridosAno.length === 0}
+              carregando={golsSofridosAnoPainel.carregando}
+              vazio={golsSofridosAnoPainel.itens.length === 0}
+              paginacao={paginacaoGolsSofridosAno}
             >
-              {golsSofridosAno.map((item, i) => (
+              {golsSofridosAnoPainel.itens.map((item, i) => (
                 <LinhaRanking
                   key={item.id}
-                  posicao={i + 1}
+                  posicao={(golsSofridosAnoPainel.pagina - 1) * 5 + i + 1}
                   jogador={item}
                   valorPrincipal={String(item.conceded)}
                   linhaSecundaria={`${item.matches} jogo${item.matches === 1 ? "" : "s"}`}
@@ -851,13 +857,14 @@ export default function RankPage() {
                 <PainelRanking
                   titulo={`Gols Sofridos · ${ano}`}
                   icon={Shield}
-                  carregando={carregandoTemporada}
-                  vazio={golsSofridosAno.length === 0}
+                  carregando={golsSofridosAnoPainel.carregando}
+                  vazio={golsSofridosAnoPainel.itens.length === 0}
+                  paginacao={paginacaoGolsSofridosAno}
                 >
-                  {golsSofridosAno.map((item, i) => (
+                  {golsSofridosAnoPainel.itens.map((item, i) => (
                     <LinhaRanking
                       key={item.id}
-                      posicao={i + 1}
+                      posicao={(golsSofridosAnoPainel.pagina - 1) * 5 + i + 1}
                       jogador={item}
                       valorPrincipal={String(item.conceded)}
                       linhaSecundaria={`${item.matches} jogo${item.matches === 1 ? "" : "s"}`}
@@ -953,13 +960,14 @@ export default function RankPage() {
         <PainelRanking
           titulo={`Gols Sofridos · ${MESES[mes - 1]}`}
           icon={Shield}
-          carregando={carregandoMes}
-          vazio={goleiros.length === 0}
+          carregando={golsSofridosMesPainel.carregando}
+          vazio={golsSofridosMesPainel.itens.length === 0}
+          paginacao={paginacaoGolsSofridosMes}
         >
-          {goleiros.map((item, i) => (
+          {golsSofridosMesPainel.itens.map((item, i) => (
             <LinhaRanking
               key={item.id}
-              posicao={i + 1}
+              posicao={(golsSofridosMesPainel.pagina - 1) * 5 + i + 1}
               jogador={item}
               valorPrincipal={String(item.conceded)}
               linhaSecundaria={`${item.matches} jogo${item.matches === 1 ? "" : "s"}`}
@@ -1049,13 +1057,14 @@ export default function RankPage() {
             <PainelRanking
               titulo={`Gols Sofridos · ${MESES[mes - 1]}`}
               icon={Shield}
-              carregando={carregandoMes}
-              vazio={goleiros.length === 0}
+              carregando={golsSofridosMesPainel.carregando}
+              vazio={golsSofridosMesPainel.itens.length === 0}
+              paginacao={paginacaoGolsSofridosMes}
             >
-              {goleiros.map((item, i) => (
+              {golsSofridosMesPainel.itens.map((item, i) => (
                 <LinhaRanking
                   key={item.id}
-                  posicao={i + 1}
+                  posicao={(golsSofridosMesPainel.pagina - 1) * 5 + i + 1}
                   jogador={item}
                   valorPrincipal={String(item.conceded)}
                   linhaSecundaria={`${item.matches} jogo${item.matches === 1 ? "" : "s"}`}
