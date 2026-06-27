@@ -7,6 +7,16 @@ import { tratarErroPrisma } from '../../../_lib/prisma-errors'
 
 const LETRAS_TIME = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
+// Atributos individuais do jogador (ausentes em jogadores convidados)
+interface AtributosJogador {
+    velocidade: number
+    finalizacao: number
+    passe: number
+    drible: number
+    defesa: number
+    fisico: number
+}
+
 interface JogadorParaSorteio {
     matchPlayerId: string
     userId: string | null
@@ -17,8 +27,21 @@ interface JogadorParaSorteio {
     posicao: string | null
     overall: number
     ehGoleiro: boolean
+    // Atributos detalhados — ausentes para convidados, que só têm overall
+    atributos: AtributosJogador | null
 }
 
+// Pesos aleatórios para cada atributo, gerados uma vez por chamada de sorteio
+interface PesosAtributos {
+    velocidade: number
+    finalizacao: number
+    passe: number
+    drible: number
+    defesa: number
+    fisico: number
+}
+
+// Embaralhamento in-place usando Fisher-Yates
 function embaralharArray<T>(array: T[]): void {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -26,38 +49,87 @@ function embaralharArray<T>(array: T[]): void {
     }
 }
 
+// Gera pesos aleatórios entre 0.5 e 1.5 para cada atributo do sorteio
+function gerarPesosAleatorios(): PesosAtributos {
+    return {
+        velocidade: 0.5 + Math.random(),
+        finalizacao: 0.5 + Math.random(),
+        passe: 0.5 + Math.random(),
+        drible: 0.5 + Math.random(),
+        defesa: 0.5 + Math.random(),
+        fisico: 0.5 + Math.random(),
+    }
+}
+
+// Calcula o overall efetivo do jogador aplicando os pesos do sorteio
+// Jogadores convidados não têm atributos individuais: escala o overall pelo peso médio
+function calcularOverallEfetivo(jogador: JogadorParaSorteio, pesos: PesosAtributos): number {
+    if (!jogador.atributos) {
+        const mediaDePesos = (
+            pesos.velocidade + pesos.finalizacao + pesos.passe +
+            pesos.drible + pesos.defesa + pesos.fisico
+        ) / 6
+        return jogador.overall * mediaDePesos
+    }
+
+    return (
+        jogador.atributos.velocidade * pesos.velocidade +
+        jogador.atributos.finalizacao * pesos.finalizacao +
+        jogador.atributos.passe * pesos.passe +
+        jogador.atributos.drible * pesos.drible +
+        jogador.atributos.defesa * pesos.defesa +
+        jogador.atributos.fisico * pesos.fisico
+    )
+}
+
+// Distribui jogadores em times usando tier shuffle + snake draft
+// Os pesos do sorteio determinam o overall efetivo (apenas para ordenação; exibição usa overall do banco)
 function distribuirJogadoresEmTimes(
     jogadores: JogadorParaSorteio[],
-    jogadoresPorTime: number
+    jogadoresPorTime: number,
+    pesos: PesosAtributos,
 ): JogadorParaSorteio[][] {
     const goleiros = jogadores.filter(j => j.ehGoleiro)
-    const linhaOrdenada = [...jogadores.filter(j => !j.ehGoleiro)]
-        .sort((a, b) => b.overall - a.overall)
 
-    const totalDeLinha = linhaOrdenada.length
+    // Ordena jogadores de campo pelo overall efetivo (float, sem arredondar)
+    const jogadoresDeLinha = [...jogadores.filter(j => !j.ehGoleiro)]
+        .sort((a, b) => calcularOverallEfetivo(b, pesos) - calcularOverallEfetivo(a, pesos))
+
+    const totalDeLinha = jogadoresDeLinha.length
     if (totalDeLinha === 0) return []
 
-    const quantidadeDeTimesCompletos = Math.floor(totalDeLinha / jogadoresPorTime)
+    const numTimesCompletos = Math.floor(totalDeLinha / jogadoresPorTime)
     const quantidadeRestante = totalDeLinha % jogadoresPorTime
 
-    const timesCompletos: JogadorParaSorteio[][] = Array.from({ length: quantidadeDeTimesCompletos }, () => [])
-
-    for (let rodada = 0; rodada < jogadoresPorTime; rodada++) {
-        const direcaoAFrente = rodada % 2 === 0
-        for (let passo = 0; passo < quantidadeDeTimesCompletos; passo++) {
-            const indiceTime = direcaoAFrente ? passo : quantidadeDeTimesCompletos - 1 - passo
-            const indiceJogador = rodada * quantidadeDeTimesCompletos + passo
-            timesCompletos[indiceTime].push(linhaOrdenada[indiceJogador])
+    // Tier shuffle: embaralha dentro de cada faixa de overall antes do snake draft
+    // Cada tier tem exatamente numTimesCompletos jogadores (um por time por rodada)
+    for (let inicio = 0; inicio < numTimesCompletos * jogadoresPorTime; inicio += numTimesCompletos) {
+        const tier = jogadoresDeLinha.slice(inicio, inicio + numTimesCompletos)
+        embaralharArray(tier)
+        for (let k = 0; k < tier.length; k++) {
+            jogadoresDeLinha[inicio + k] = tier[k]
         }
     }
 
-    embaralharArray(timesCompletos)
+    const timesCompletos: JogadorParaSorteio[][] = Array.from({ length: numTimesCompletos }, () => [])
 
-    const times = [...timesCompletos]
-    if (quantidadeRestante > 0) {
-        times.push(linhaOrdenada.slice(quantidadeDeTimesCompletos * jogadoresPorTime))
+    // Snake draft: alterna direção a cada rodada para equilibrar os times
+    for (let rodada = 0; rodada < jogadoresPorTime; rodada++) {
+        const direcaoAFrente = rodada % 2 === 0
+        for (let passo = 0; passo < numTimesCompletos; passo++) {
+            const indiceTime = direcaoAFrente ? passo : numTimesCompletos - 1 - passo
+            const indiceJogador = rodada * numTimesCompletos + passo
+            timesCompletos[indiceTime].push(jogadoresDeLinha[indiceJogador])
+        }
     }
 
+    // Time extra com os jogadores restantes (quando totalDeLinha não é divisível)
+    const times = [...timesCompletos]
+    if (quantidadeRestante > 0) {
+        times.push(jogadoresDeLinha.slice(numTimesCompletos * jogadoresPorTime))
+    }
+
+    // Distribui goleiros ciclicamente pelos times
     goleiros.forEach((goleiro, indice) => {
         times[indice % times.length].push(goleiro)
     })
@@ -145,6 +217,7 @@ export async function GET(
 }
 
 // Seleção de colunas reutilizada nas consultas de jogadores confirmados
+// Inclui os 6 atributos individuais para cálculo do overall efetivo no sorteio
 const INCLUDE_JOGADORES = {
     users: {
         select: {
@@ -154,13 +227,24 @@ const INCLUDE_JOGADORES = {
             photo_url: true,
             position: true,
             is_goalkeeper: true,
-            player_ratings: { select: { overall: true } },
+            player_ratings: {
+                select: {
+                    overall: true,
+                    speed: true,
+                    finishing: true,
+                    passing: true,
+                    dribbling: true,
+                    defense: true,
+                    physical: true,
+                },
+            },
         },
     },
     guest_players: { select: { id: true, name: true, position: true } },
 } as const
 
 // Converte um match_player do Prisma para o tipo JogadorParaSorteio
+// Atributos individuais são mapeados apenas para jogadores cadastrados (não convidados)
 function mapearMatchPlayer(mp: {
     id: string
     user_id: string | null
@@ -172,11 +256,20 @@ function mapearMatchPlayer(mp: {
         photo_url: string | null
         position: string | null
         is_goalkeeper: boolean
-        // overall pode ser null no schema Prisma; o ?? 5 garante um fallback numérico
-        player_ratings: { overall: number | null } | null
+        player_ratings: {
+            overall: number | null
+            speed: number
+            finishing: number
+            passing: number
+            dribbling: number
+            defense: number
+            physical: number
+        } | null
     } | null
     guest_players?: { name: string; position: string | null } | null
 }): JogadorParaSorteio {
+    const ratings = mp.users?.player_ratings ?? null
+
     return {
         matchPlayerId: mp.id,
         userId: mp.user_id,
@@ -185,8 +278,20 @@ function mapearMatchPlayer(mp: {
         apelido: mp.users?.nickname ?? null,
         fotoUrl: mp.users?.photo_url ?? null,
         posicao: mp.users?.position ?? mp.guest_players?.position ?? null,
-        overall: mp.users?.player_ratings?.overall ?? 5,
+        // Overall do banco é usado na exibição; o overall efetivo é calculado no sorteio
+        overall: ratings?.overall ?? 5,
         ehGoleiro: mp.is_goalkeeper || (mp.users?.is_goalkeeper ?? false),
+        // Convidados não têm atributos individuais; calcularOverallEfetivo trata o null
+        atributos: ratings
+            ? {
+                velocidade: ratings.speed,
+                finalizacao: ratings.finishing,
+                passe: ratings.passing,
+                drible: ratings.dribbling,
+                defesa: ratings.defense,
+                fisico: ratings.physical,
+            }
+            : null,
     }
 }
 
@@ -285,7 +390,9 @@ export async function POST(
 
         const jogadoresParaSorteio = jogadoresConfirmados.map(mapearMatchPlayer)
 
-        const timesDistribuidos = distribuirJogadoresEmTimes(jogadoresParaSorteio, jogadoresPorTime)
+        // Gera pesos aleatórios uma vez por sorteio — garante resultados diferentes a cada chamada
+        const pesosDoSorteio = gerarPesosAleatorios()
+        const timesDistribuidos = distribuirJogadoresEmTimes(jogadoresParaSorteio, jogadoresPorTime, pesosDoSorteio)
         const quantidadeDeTimes = timesDistribuidos.length
 
         const nomesDosTime: string[] = body.team_names ??

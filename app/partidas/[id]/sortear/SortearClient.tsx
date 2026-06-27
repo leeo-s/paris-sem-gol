@@ -387,7 +387,7 @@ export function SortearClient({ matchId }: { matchId: string }) {
   const numeroDeTimes = useMemo(() => {
     if (!jogadoresParaAtribuir) return 2;
     const jogadoresDeCampo = jogadoresParaAtribuir.filter((j) => !j.ehGoleiro);
-    return Math.max(2, Math.floor(jogadoresDeCampo.length / jogadoresPorTime));
+    return Math.max(2, Math.ceil(jogadoresDeCampo.length / jogadoresPorTime));
   }, [jogadoresParaAtribuir, jogadoresPorTime]);
 
   // Overall médio de cada time (somente jogadores de campo) conforme atribuições atuais
