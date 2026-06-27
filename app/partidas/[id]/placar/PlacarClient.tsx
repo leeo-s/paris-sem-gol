@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -160,6 +160,13 @@ function SkeletonCard() {
 export function PlacarClient({ matchId }: { matchId: string }) {
   const router = useRouter();
 
+  // Chave única no localStorage para os dados não salvos desta partida
+  const chaveStorage = `psg_placar_rascunho_${matchId}`;
+
+  // Controla se o carregamento inicial já foi concluído, evitando sobrescrever
+  // o localStorage com estado vazio durante o mount
+  const dadosCarregados = useRef(false);
+
   // Lista normalizada de jogadores da partida
   const [jogadores, setJogadores] = useState<JogadorPlacar[]>([]);
 
@@ -174,7 +181,21 @@ export function PlacarClient({ matchId }: { matchId: string }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Busca jogadores e pré-preenche gols já salvos ao montar o componente
+  // Persiste as contagens no localStorage sempre que alguma mudar,
+  // mas só após o carregamento inicial para não gravar estado vazio
+  useEffect(() => {
+    if (!dadosCarregados.current) return;
+    try {
+      localStorage.setItem(
+        chaveStorage,
+        JSON.stringify({ golsMarcados, golsSofridos }),
+      );
+    } catch {
+      // Ignora erros de cota ou modo privado
+    }
+  }, [golsMarcados, golsSofridos, chaveStorage]);
+
+  // Busca jogadores e pré-preenche gols ao montar o componente
   useEffect(() => {
     async function carregarDados() {
       setCarregando(true);
@@ -230,7 +251,6 @@ export function PlacarClient({ matchId }: { matchId: string }) {
           if (chave)
             marcadosIniciais[chave] = (marcadosIniciais[chave] ?? 0) + 1;
         }
-        setGolsMarcados(marcadosIniciais);
 
         // Pré-preenche gols sofridos (cada registro já tem a quantidade)
         const sofridosIniciais: Record<string, number> = {};
@@ -242,7 +262,30 @@ export function PlacarClient({ matchId }: { matchId: string }) {
               : undefined;
           if (chave) sofridosIniciais[chave] = gc.amount;
         }
+
+        // Se há um rascunho salvo localmente, usa ele em vez dos dados da API
+        // (representa marcações feitas após o último reload, não salvas ainda)
+        try {
+          const rascunhoSalvo = localStorage.getItem(chaveStorage);
+          if (rascunhoSalvo) {
+            const { golsMarcados: marcadosSalvos, golsSofridos: sofridosSalvos } =
+              JSON.parse(rascunhoSalvo) as {
+                golsMarcados: Record<string, number>;
+                golsSofridos: Record<string, number>;
+              };
+            setGolsMarcados(marcadosSalvos ?? {});
+            setGolsSofridos(sofridosSalvos ?? {});
+            dadosCarregados.current = true;
+            return;
+          }
+        } catch {
+          // Rascunho corrompido ou inacessível — usa dados da API normalmente
+        }
+
+        // Sem rascunho: usa os dados vindos da API
+        setGolsMarcados(marcadosIniciais);
         setGolsSofridos(sofridosIniciais);
+        dadosCarregados.current = true;
       } catch {
         setErro("Erro ao carregar os dados da partida.");
       } finally {
@@ -251,7 +294,7 @@ export function PlacarClient({ matchId }: { matchId: string }) {
     }
 
     carregarDados();
-  }, [matchId]);
+  }, [matchId, chaveStorage]);
 
   // Atualiza a contagem de gols marcados de um jogador
   function alterarGolsMarcados(matchPlayerId: string, novoValor: number) {
@@ -333,6 +376,13 @@ export function PlacarClient({ matchId }: { matchId: string }) {
         const dados = await resEncerrar.json();
         setErro(dados.error ?? "Erro ao encerrar a partida.");
         return;
+      }
+
+      // Limpa o rascunho salvo localmente ao encerrar com sucesso
+      try {
+        localStorage.removeItem(chaveStorage);
+      } catch {
+        // Ignora erros de acesso ao storage
       }
 
       router.push(`/partidas/${matchId}`);
